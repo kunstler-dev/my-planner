@@ -839,3 +839,174 @@ textarea.input {
   border-radius: 6px;
   padding: 1px 6px;
 }
+
+/* ---- sidebar scrolls when there are many sections ---- */
+.sidebar {
+  overflow-y: auto;
+}
+.nav-group {
+  padding-top: 12px;
+}
+.nav-item {
+  padding: 8px 10px;
+}
+
+/* ---- budgets ---- */
+.budget-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.budget-row:last-child {
+  border-bottom: 0;
+}
+.bar-track.over .bar-fill {
+  background: repeating-linear-gradient(45deg, var(--ink) 0 6px, var(--muted) 6px 12px);
+}
+.bar-track.invert {
+  background: color-mix(in srgb, var(--invert) 25%, transparent);
+}
+.bar-track.invert .bar-fill {
+  background: var(--invert);
+}
+
+/* ---- content plan week strip ---- */
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+.day-cell {
+  min-height: 92px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.day-cell:hover {
+  border-color: var(--ink);
+}
+.day-cell.has {
+  border-color: var(--ink);
+}
+.day-name {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+.day-post {
+  font-size: 12.5px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--invert);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- habits ---- */
+.habit-dots {
+  display: flex;
+  gap: 3px;
+}
+.habit-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1.4px solid var(--line);
+  cursor: pointer;
+}
+.habit-dots i.on {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+/* ---- notes ---- */
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.note {
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.note:hover {
+  border-color: var(--ink);
+}
+.note.pinned {
+  border-color: var(--ink);
+}
+.note h3 {
+  font-size: 15px;
+}
+.note-text {
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 8;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--ink-2);
+}
+
+/* ---- career board ---- */
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(165px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+}
+.kanban-col {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 140px;
+}
+.kanban-head {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 650;
+  font-size: 13px;
+  padding: 2px 4px 4px;
+}
+.kanban-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.kanban-card:hover {
+  border-color: var(--ink);
+}
+.kanban-card.due {
+  border: 1.5px dashed var(--ink);
+}
+
+/* ---- project mini stats ---- */
+.mini-stat {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+.mini-value {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

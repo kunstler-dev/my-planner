@@ -3,7 +3,6 @@
 const GROK_URL = 'https://grok.com/';
 let host;
 let webview;
-let ready = false;
 let placeholder = null;
 let raf = 0;
 
@@ -15,8 +14,6 @@ function ensure() {
   webview.setAttribute('partition', 'persist:grok');
   webview.setAttribute('allowpopups', '');
   webview.setAttribute('src', GROK_URL);
-  webview.addEventListener('dom-ready', () => (ready = true));
-  webview.addEventListener('did-start-loading', () => (ready = false));
   host.append(webview);
   document.body.append(host);
 }
@@ -44,22 +41,28 @@ export function hideGrokWeb() {
   host?.classList.remove('visible');
 }
 
-// Runs inside grok.com: puts the text into the visible message box (textarea or contenteditable) without sending.
+// Runs inside grok.com: puts the text into the message box without sending. The box is a ProseMirror editor
+// (contenteditable); a synthetic paste keeps line breaks. A plain textarea is the fallback.
 const FILL = `(text) => {
   const visible = (el) => el && el.offsetParent !== null;
-  const ta = [...document.querySelectorAll('textarea')].find(visible);
+  const editor = [...document.querySelectorAll('.ProseMirror[contenteditable="true"], [contenteditable="true"]')].find(visible);
+  const head = text.slice(0, 20).trim();
+  if (editor) {
+    if (head && editor.innerText.includes(head)) return true;
+    editor.focus();
+    const dt = new DataTransfer();
+    dt.setData('text/plain', text);
+    editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    if (editor.innerText.includes(head)) return true;
+    document.execCommand('insertText', false, text);
+    return editor.innerText.includes(head);
+  }
+  const ta = [...document.querySelectorAll('textarea')].find((t) => visible(t) && t.offsetHeight > 20);
   if (ta) {
     const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
     set.call(ta, text);
     ta.dispatchEvent(new Event('input', { bubbles: true }));
     ta.focus();
-    return true;
-  }
-  const ce = [...document.querySelectorAll('[contenteditable="true"]')].find(visible);
-  if (ce) {
-    ce.focus();
-    document.execCommand('selectAll', false);
-    document.execCommand('insertText', false, text);
     return true;
   }
   return false;
@@ -72,12 +75,10 @@ export async function fillGrokWeb(text) {
   ensure();
   // The page is a SPA: wait for it to load and render the input (up to ~15 s).
   for (let i = 0; i < 30; i++) {
-    if (ready) {
-      try {
-        if (await webview.executeJavaScript(`(${FILL})(${JSON.stringify(text)})`)) return true;
-      } catch {
-        // page is navigating
-      }
+    try {
+      if (await webview.executeJavaScript(`(${FILL})(${JSON.stringify(text)})`)) return true;
+    } catch {
+      // not attached yet or navigating
     }
     await wait(500);
   }

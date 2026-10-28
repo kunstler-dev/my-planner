@@ -138,6 +138,18 @@ app.whenReady().then(() => {
     return true;
   });
 
+  // Official NBU exchange rates (UAH per EUR / USD) for converting account balances.
+  ipcMain.handle('rates:fetch', async () => {
+    try {
+      const res = await fetch('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json');
+      if (!res.ok) return { ok: false, error: 'http' };
+      const list = await res.json();
+      return { ok: true, list: list.filter((x) => x.cc === 'EUR' || x.cc === 'USD').map((x) => ({ cc: x.cc, rate: x.rate, date: x.exchangedate })) };
+    } catch (err) {
+      return { ok: false, error: 'network', message: err.message };
+    }
+  });
+
   // Public channel preview page t.me/s/<name>; parsed in the renderer.
   ipcMain.handle('tg:fetch', async (_e, { username, before }) => {
     const name = String(username || '').replace(/[^A-Za-z0-9_]/g, '');

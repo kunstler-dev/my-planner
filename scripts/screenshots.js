@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 
 const out = path.resolve(process.argv[2] || 'shots');
-const channels = (process.argv[3] || 'durov,telegram').split(',');
+const channels = (process.argv[3] || 'durov').split(',');
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'planner-shots-'));
 process.env.PLANNER_DATA_DIR = dataDir;
 
@@ -37,7 +37,55 @@ function demoData() {
     { id: 't3', title: 'Оплатить интернет', date: day(0), done: true, doneAt: day(0) },
     { id: 't4', title: 'Подготовить розыгрыш', date: day(-2), done: false },
   ];
-  return { version: 1, settings: { theme: 'light', currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
+  // v3 sections (the rest of the object is v1 data, to exercise the migration).
+  const v3 = {
+    accounts: [
+      { id: 'trust', name: 'Trust Wallet (крипта)', currency: '$', balance: 840, updatedAt: day(3), history: [{ date: day(20), balance: 700 }, { date: day(3), balance: 840 }] },
+      { id: 'ua', name: 'Украинская карта', currency: '₴', balance: 12500, updatedAt: day(1), history: [{ date: day(20), balance: 9000 }, { date: day(1), balance: 12500 }] },
+      { id: 'de', name: 'Немецкая карта', currency: '€', balance: 1630, updatedAt: day(0), history: [{ date: day(20), balance: 1200 }, { date: day(0), balance: 1630 }] },
+    ],
+    budgets: { Еда: 12000, Развлечения: 2000, Транспорт: 4000 },
+    recurring: [
+      { id: 'r1', active: true, type: 'expense', title: 'Аренда', amount: 25000, category: 'Жильё', day: 1, next: day(-4) },
+      { id: 'r2', active: true, type: 'expense', title: 'Spotify', amount: 11, category: 'Связь и подписки', day: 2, next: day(-5) },
+      { id: 'r3', active: true, type: 'income', title: 'Зарплата', amount: 60000, category: 'Зарплата', day: 25, next: day(-27) },
+    ],
+    goals: [{ id: 'g1', title: 'Подушка безопасности', target: 3000, deadline: day(-180), contributions: [{ amount: 900, date: day(30) }] }],
+    habits: [
+      { id: 'h1', title: '30 минут немецкого', days: [day(0), day(1), day(2), day(3), day(5)] },
+      { id: 'h2', title: 'Один отклик в день', days: [day(1), day(2)] },
+    ],
+    notes: [
+      { id: 'n1', title: 'Вопросы на собеседование', text: 'Wie sieht ein typischer Tag aus?\nGibt es eine Übernahme nach der Ausbildung?', pinned: true, updatedAt: day(2) },
+      { id: 'n2', title: 'Идеи постов', text: 'Итоги месяца\nКак я делал планер', updatedAt: day(5) },
+    ],
+    contentPlan: [
+      { id: 'c1', channel: channels[0], title: 'Итоги недели', date: day(-1), status: 'planned', note: '' },
+      { id: 'c2', channel: channels[0], title: 'Розыгрыш', date: day(-3), status: 'planned', note: '' },
+      { id: 'c3', channel: channels[0], title: 'Как я ищу Ausbildung', date: '', status: 'idea', note: '' },
+    ],
+    ads: [
+      { id: 'a1', channel: channels[0], kind: 'buy', partner: '@techchannel', date: day(10), price: 40, gained: 120, views: 3000 },
+      { id: 'a2', channel: channels[0], kind: 'sell', partner: 'Онлайн-школа', date: day(4), price: 60 },
+    ],
+    career: {
+      weeklyGoal: 5,
+      applications: [
+        { id: 'p1', company: 'Deutsche Bahn', position: 'Fachinformatiker Anwendungsentwicklung', kind: 'ausbildung', city: 'Berlin', status: 'sent', sentAt: day(9), followUp: day(2) },
+        { id: 'p2', company: 'Siemens', position: 'Fachinformatiker Systemintegration', kind: 'ausbildung', city: 'München', status: 'interview', sentAt: day(15) },
+        { id: 'p3', company: 'REWE', position: 'Kaufmann im Einzelhandel', kind: 'ausbildung', city: 'Köln', status: 'wish' },
+        { id: 'p4', company: 'Lidl', position: 'Werkstudent IT', kind: 'werkstudent', city: 'Berlin', status: 'sent', sentAt: day(1) },
+        { id: 'p5', company: 'Zalando', position: 'Praktikum Frontend', kind: 'praktikum', city: 'Berlin', status: 'rejected', sentAt: day(25) },
+      ],
+    },
+    projects: [
+      { id: 'pr1', name: 'Planner', status: 'active', description: 'Десктопный планер', money: 'Продажа шаблонов', hours: [{ hours: 12, date: day(2) }], milestones: [{ id: 'm1', title: 'Релиз 1.3', done: true, doneAt: day(0) }, { id: 'm2', title: 'Сайт', done: false }] },
+      { id: 'pr2', name: 'ELT-бот', status: 'launched', description: 'Telegram Mini App', money: 'Реклама, подписки', hours: [{ hours: 40, date: day(6) }], milestones: [] },
+    ],
+    play: { sessions: [{ id: 's1', game: 'Dota 2', minutes: 45, date: day(0) }], rewards: { task: 15, application: 30, habit: 10, milestone: 30 } },
+  };
+  finance.push({ id: 'pf1', type: 'income', amount: 300, category: 'Продажи', date: day(3), note: 'Заказ', projectId: 'pr1' });
+  return { ...v3, version: 1, settings: { theme: 'light', currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
     { role: 'user', content: 'Посмотри на мои финансы и скажи, где я теряю деньги.' },
     { role: 'assistant', content: '### Коротко\nТы откладываешь **~40%** дохода — это хорошо.\n\n- Реклама канала: 5 тыс. ₽/мес — проверь окупаемость закупов\n- Еда: можно срезать 10–15%\n\n1. Заведи лимит на развлечения\n2. Считай цену подписчика с каждого закупа' },
   ] };
@@ -88,9 +136,40 @@ app.on('browser-window-created', (_e, win) => {
       }
       for (const theme of ['light', 'dark']) {
         if (theme === 'dark') await click('Тёмная тема');
-        for (const [view, name] of [['Главная', 'home'], ['Финансы', 'finance'], ['Telegram-каналы', 'channel'], ['Grok', 'grok'], ['Настройки', 'settings']]) {
+        const tab = (label) => js(`[...document.querySelectorAll('main .seg button')].find(b => b.textContent === ${JSON.stringify(label)})?.click()`);
+        const views = [
+          ['Главная', 'home'],
+          ['Финансы', 'finance', ['Бюджеты', 'Регулярные платежи', 'Цели', 'Операции']],
+          ['Счета', 'accounts'],
+          ['Карьера', 'career'],
+          ['Проекты', 'projects'],
+          ['Telegram-каналы', 'channel', ['Контент-план', 'Реклама', 'Аналитика']],
+          ['Задачи и привычки', 'tasks'],
+          ['Заметки', 'notes'],
+          ['Игры', 'play'],
+          ['Grok', 'grok'],
+          ['Настройки', 'settings'],
+        ];
+        for (const [view, name, tabs] of views) {
+          if (theme === 'dark' && !['home', 'finance', 'career', 'grok'].includes(name)) continue;
           await click(view);
+          if (name === 'grok') await wait(6000);
           await shot(`${name}-${theme}`);
+          for (const t of (theme === 'light' && tabs) || []) {
+            if (t === tabs.at(-1)) {
+              await tab(t);
+              continue;
+            }
+            await tab(t);
+            await shot(`${name}-${t.split(' ')[0].toLowerCase()}-${theme}`);
+          }
+        }
+        if (theme === 'light') {
+          await click('Grok');
+          await js(`[...document.querySelectorAll('main .chip')].find(b => b.textContent === 'Разбор денег')?.click()`);
+          await wait(8000);
+          log('grok toast:', await js("document.getElementById('toast')?.textContent"));
+          await shot('grok-filled-light');
         }
       }
       await click('Финансы');

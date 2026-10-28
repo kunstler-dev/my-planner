@@ -1,13 +1,15 @@
-// Home: today's tasks, month money, channel at a glance, recent operations.
+// Home: money, channels, career and game time at a glance; today's tasks and habits, upcoming payments.
 import { state, update } from '../state.js';
 import { h, icon, money, compact, uid, card, empty } from '../ui.js';
 import { lineChart } from '../charts.js';
 import { today, thisMonth, longToday, prettyDate, addDays } from '../dates.js';
 import { totals, inMonth } from '../finance-calc.js';
-import { postList, windowStats, subscriberDelta } from '../tg.js';
+import { postList, subscriberDelta } from '../tg.js';
 import { entryModal, entryRow } from './finance.js';
 import { askGrokAboutChannel, activeChannel } from './channel.js';
 import { go } from '../app.js';
+import { netWorth, upcoming, careerStats, playBalance, minutesText, budgetStatus } from '../planner-calc.js';
+import { habitRow } from './tasks.js';
 
 function greeting() {
   const hr = new Date().getHours();
@@ -27,7 +29,7 @@ function tile(label, iconName, value, note, onclick) {
   );
 }
 
-function taskRow(t) {
+export function taskRow(t) {
   const overdue = !t.done && t.date < today();
   return h(
     'div',
@@ -115,8 +117,12 @@ export function homeView() {
   const subs = channels.reduce((s, c) => s + (c.snapshots.at(-1)?.subscribers || 0), 0);
   const deltas = channels.map((c) => subscriberDelta(c.snapshots, 7, today())).filter(Boolean);
   const d7 = deltas.length ? deltas.reduce((s, d) => s + d.delta, 0) : null;
-  const w7 = windowStats(posts, 7);
-  const recent = [...state.data.finance].sort((a, b) => b.date.localeCompare(a.date) || (b.id > a.id ? 1 : -1)).slice(0, 6);
+  const recent = [...state.data.finance].sort((a, b) => b.date.localeCompare(a.date) || (b.id > a.id ? 1 : -1)).slice(0, 5);
+  const nw = netWorth(state.data.accounts, state.data.rates, state.data.settings.currency);
+  const cs = careerStats(state.data.career.applications, today());
+  const pb = playBalance(state.data, today());
+  const soon = upcoming(state.data.recurring, today(), 7);
+  const overBudget = budgetStatus(inMonth(state.data.finance, thisMonth()), state.data.budgets).filter((b) => b.share >= 0.9);
 
   return h(
     'div',
@@ -135,21 +141,58 @@ export function homeView() {
     h(
       'div',
       { class: 'grid cols-4', style: { marginBottom: '16px' } },
-      tile('Доходы за месяц', 'up', money(m.income), null, () => go('finance')),
-      tile('Расходы за месяц', 'down', money(m.expense), `итог ${money(m.net, { sign: true })}`, () => go('finance')),
+      tile('Всего денег', 'card', money(nw.total), state.data.accounts.map((a) => a.name.split(' ')[0]).join(' · '), () => go('accounts')),
+      tile('Месяц', 'wallet', money(m.net, { sign: true }), `доходы ${money(m.income)} · расходы ${money(m.expense)}`, () => go('finance')),
       tile(channels.length > 1 ? `Подписчики · ${channels.length} канала` : 'Подписчики', 'users', subs ? compact(subs) : '—', subs ? (d7 != null ? `${d7 >= 0 ? '+' : '−'}${compact(Math.abs(d7))} за неделю` : channels.map((c) => `@${c.username}`).join(', ')) : 'канал не подключён', () => go('channel')),
-      tile('Средний охват · 7 дней', 'eye', w7.avgViews ? compact(w7.avgViews) : '—', ch ? `@${ch.username} · ${w7.count} постов за неделю` : null, () => go('channel')),
+      tile('Откликов за неделю', 'briefcase', `${cs.week} / ${state.data.career.weeklyGoal}`, cs.followUps.length ? `⏰ написать повторно: ${cs.followUps.length}` : `всего отправлено ${cs.sent}`, () => go('career')),
     ),
     h(
       'div',
       { class: 'grid cols-3', style: { alignItems: 'start' } },
-      tasksCard(),
-      card(
-        'Последние операции',
-        h('button', { class: 'btn ghost sm', onclick: () => go('finance') }, 'Все', icon('right', 14)),
-        recent.length ? h('div', { class: 'list' }, recent.map((e) => entryRow(e, { showDate: true }))) : empty('Записей пока нет.'),
+      h(
+        'div',
+        { class: 'stack' },
+        tasksCard(),
+        card(
+          'Привычки',
+          h('button', { class: 'btn ghost sm', onclick: () => go('tasks') }, 'Все', icon('right', 14)),
+          state.data.habits.length ? h('div', { class: 'list' }, state.data.habits.map((hb) => habitRow(hb, { compact: true }))) : empty('Добавь привычки во вкладке «Задачи и привычки».'),
+        ),
       ),
-      card(
+      h(
+        'div',
+        { class: 'stack' },
+        card(
+          'Последние операции',
+          h('button', { class: 'btn ghost sm', onclick: () => go('finance') }, 'Все', icon('right', 14)),
+          recent.length ? h('div', { class: 'list' }, recent.map((e) => entryRow(e, { showDate: true }))) : empty('Записей пока нет.'),
+        ),
+        card(
+          'Ближайшие платежи',
+          null,
+          soon.length
+            ? h(
+                'div',
+                { class: 'list' },
+                soon.map((r) =>
+                  h('div', { class: 'list-row' }, h('div', { class: 'grow' }, h('div', { class: 'title' }, r.title), h('div', { class: 'meta' }, prettyDate(r.next))), h('div', { class: `amount${r.type === 'expense' ? ' out' : ''}` }, money(r.type === 'income' ? r.amount : -r.amount, { sign: true }))),
+                ),
+              )
+            : empty('На неделе обязательных платежей нет.'),
+          overBudget.length > 0 && h('div', { class: 'meta', style: { marginTop: '8px' } }, `⚠ Бюджет почти исчерпан: ${overBudget.map((b) => b.category).join(', ')}`),
+        ),
+      ),
+      h(
+        'div',
+        { class: 'stack' },
+        h(
+          'button',
+          { class: 'card stat dark', style: { textAlign: 'left', cursor: 'pointer' }, onclick: () => go('play') },
+          h('div', { class: 'stat-label' }, icon('gamepad', 16), 'Игровое время'),
+          h('div', { class: 'stat-value' }, pb.balance > 0 ? minutesText(pb.balance) : '0 мин'),
+          h('div', { class: 'stat-note' }, pb.balance < 0 ? `долг ${minutesText(-pb.balance)} — сначала дела` : `заработано за неделю ${minutesText(pb.earned)}`),
+        ),
+        card(
         ch ? `@${ch.username}` : 'Telegram-канал',
         h(
           'div',
@@ -181,6 +224,7 @@ export function homeView() {
               h('button', { class: 'btn', onclick: askGrokAboutChannel }, icon('spark', 16), 'Разбор канала от Grok'),
             )
           : h('div', {}, empty('Подключи канал, чтобы видеть подписчиков и охваты.'), h('button', { class: 'btn', onclick: () => go('channel') }, 'Подключить')),
+        ),
       ),
     ),
   );

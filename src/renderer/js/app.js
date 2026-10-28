@@ -1,21 +1,35 @@
 // Boot, sidebar navigation and view switching.
 import { state, loadState, setRenderer, update } from './state.js';
-import { h, icon } from './ui.js';
+import { h, icon, toast } from './ui.js';
 import { petCorner } from './pets.js';
+import { today } from './dates.js';
 import { homeView } from './views/home.js';
 import { financeView } from './views/finance.js';
+import { syncRecurring } from './views/finance-extra.js';
+import { accountsView } from './views/accounts.js';
 import { channelView } from './views/channel.js';
+import { careerView } from './views/career.js';
+import { projectsView } from './views/projects.js';
+import { tasksView } from './views/tasks.js';
+import { notesView } from './views/notes.js';
+import { playView } from './views/play.js';
 import { grokView } from './views/grok.js';
 import { settingsView } from './views/settings.js';
 
 const VIEWS = {
   home: { title: 'Главная', icon: 'home', render: homeView },
   finance: { title: 'Финансы', icon: 'wallet', render: financeView },
+  accounts: { title: 'Счета', icon: 'card', render: accountsView },
+  career: { title: 'Карьера', icon: 'briefcase', render: careerView },
+  projects: { title: 'Проекты', icon: 'rocket', render: projectsView },
   channel: { title: 'Telegram-каналы', icon: 'send', render: channelView },
+  tasks: { title: 'Задачи и привычки', icon: 'list', render: tasksView },
+  notes: { title: 'Заметки', icon: 'note', render: notesView },
+  play: { title: 'Игры', icon: 'gamepad', render: playView },
   grok: { title: 'Grok', icon: 'spark', render: grokView },
   settings: { title: 'Настройки', icon: 'gear', render: settingsView },
 };
-const NAV = [['home'], ['Учёт', 'finance', 'channel'], ['Помощник', 'grok']];
+const NAV = [['home'], ['Деньги', 'finance', 'accounts'], ['Работа', 'career', 'projects', 'channel'], ['Личное', 'tasks', 'notes', 'play'], ['Помощник', 'grok']];
 
 export function go(view, opts) {
   state.view = view;
@@ -68,7 +82,17 @@ function applyTheme() {
   window.api.setTheme(state.data.settings.theme);
 }
 
+// Recurring payments are written once per day (on start, and when the app stays open past midnight).
+let recurringChecked = '';
+function checkRecurring() {
+  if (recurringChecked === today()) return;
+  recurringChecked = today();
+  const n = syncRecurring();
+  if (n) toast(`Записаны регулярные платежи: ${n}`);
+}
+
 function render() {
+  checkRecurring();
   renderNav();
   const main = document.getElementById('main');
   const view = VIEWS[state.view] || VIEWS.home;

@@ -1,14 +1,35 @@
-// Finance: income and expense records, month overview, categories, 12-month chart, CSV export.
+// Finance: operations (records, month overview, categories, 12-month chart, CSV) plus the Budgets, Recurring and
+// Goals tabs from finance-extra.js.
 import { state, update } from '../state.js';
 import { h, icon, money, compact, uid, card, empty, toast } from '../ui.js';
 import { openModal } from '../modal.js';
 import { barChart, barList } from '../charts.js';
 import { today, thisMonth, shiftMonth, monthTitle, monthShort, prettyDate } from '../dates.js';
 import { totals, inMonth, byCategory, monthlySeries, dailyAverage, toCSV, DEFAULT_CATEGORIES } from '../finance-calc.js';
+import { budgetsTab, recurringTab, goalsTab } from './finance-extra.js';
 
-const ui = { month: thisMonth(), filter: 'all', query: '' };
+const ui = { month: thisMonth(), filter: 'all', query: '', tab: 'ops' };
 
-function categories(type) {
+const TABS = [
+  ['ops', 'Операции'],
+  ['budgets', 'Бюджеты'],
+  ['recurring', 'Регулярные платежи'],
+  ['goals', 'Цели'],
+];
+
+export function financeTabs() {
+  return h(
+    'div',
+    { class: 'seg', style: { marginBottom: '18px' } },
+    TABS.map(([k, label]) => h('button', { class: ui.tab === k ? 'on' : '', onclick: () => ((ui.tab = k), update(() => {})) }, label)),
+  );
+}
+
+export function openFinanceTab(tab) {
+  ui.tab = tab;
+}
+
+export function categories(type) {
   const used = state.data.finance.filter((e) => e.type === type).map((e) => e.category);
   return [...new Set([...DEFAULT_CATEGORIES[type], ...used])].filter(Boolean);
 }
@@ -50,6 +71,13 @@ export function entryModal(entry) {
   const category = h('input', { class: 'input', list: listId, value: draft.category, placeholder: 'Например, Еда' });
   const date = h('input', { class: 'input', type: 'date', required: true, value: draft.date });
   const note = h('input', { class: 'input', value: draft.note, placeholder: 'Необязательно' });
+  const projects = state.data.projects;
+  const project = h(
+    'select',
+    { class: 'input' },
+    h('option', { value: '' }, '— не относится к проекту —'),
+    projects.map((p) => h('option', { value: p.id, selected: p.id === draft.projectId ? 'selected' : null }, p.name)),
+  );
 
   const body = h(
     'div',
@@ -58,6 +86,7 @@ export function entryModal(entry) {
     h('div', { class: 'grid cols-2', style: { gap: '12px' } }, h('label', { class: 'field' }, 'Сумма', amount), h('label', { class: 'field' }, 'Дата', date)),
     h('label', { class: 'field' }, 'Категория', category, datalist),
     h('label', { class: 'field' }, 'Комментарий', note),
+    projects.length > 0 && h('label', { class: 'field' }, 'Проект', project),
   );
 
   const modal = openModal(isNew ? 'Новая запись' : 'Запись', body, {
@@ -68,6 +97,8 @@ export function entryModal(entry) {
         return false;
       }
       const rec = {
+        ...entry,
+        projectId: project.value || undefined,
         id: draft.id || uid(),
         type: draft.type,
         amount: value,
@@ -133,6 +164,13 @@ function pctChange(cur, prev) {
 }
 
 export function financeView() {
+  if (ui.tab === 'budgets') return budgetsTab();
+  if (ui.tab === 'recurring') return recurringTab();
+  if (ui.tab === 'goals') return goalsTab();
+  return opsView();
+}
+
+function opsView() {
   const all = state.data.finance;
   const month = inMonth(all, ui.month);
   const t = totals(month);
@@ -249,6 +287,7 @@ export function financeView() {
         h('button', { class: 'btn primary', onclick: () => entryModal({ type: 'expense' }) }, icon('plus', 16), 'Расход'),
       ),
     ),
+    financeTabs(),
     h(
       'div',
       { class: 'grid cols-4', style: { marginBottom: '16px' } },

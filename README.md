@@ -1,19 +1,24 @@
 # Planner
 
-A black-and-white Windows desktop planner: income & expense tracking (euro or hryvnia), analytics for public
-Telegram channels, a Grok (xAI) assistant, today's tasks — and the pet corner from
-[Kitten Planner](https://github.com/kunstler-dev/kitten-planner). The interface is in Russian.
-All data stays on the local machine; there is no sync.
+A black-and-white Windows desktop planner for money, job search, side projects and Telegram channels, with a Grok
+assistant and the pet corner from [Kitten Planner](https://github.com/kunstler-dev/kitten-planner). The interface is in
+Russian. All data stays on the local machine; there is no sync.
 
 ## Sections
 
-| Section              | What it does                                                                                                                                                                                                                                         |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Home**             | Today's tasks (quick add, move to tomorrow), month income/expenses, subscribers and reach at a glance, latest operations.                                                                                                                             |
-| **Finance**          | Income/expense records with categories and notes, month switcher, totals vs. previous month, saved share of income, expenses and income by category, 12-month chart, CSV export (Excel-friendly).                                                    |
-| **Telegram channels** | Any number of channels with a switcher. Reads the public page `t.me/s/<channel>` (no bot, no API key): subscribers (a snapshot per day, past values can be entered by hand), average reach for 7/30 days, ERR, posts per week, reach of the last posts, best weekday and time to post, top posts. |
-| **Grok**             | Two modes: grok.com inside the app with your own subscription (sign in once, the session is kept, no API costs; quick prompts are pasted into its message box), or a streaming chat through the xAI API with your own key (encrypted with Windows DPAPI). Quick prompts send your finance and channel numbers along: finance review, channels review, post ideas, weekly plan. Model is selectable.                          |
-| **Settings**         | xAI key and model (list loaded from the API), light/dark theme, pets on/off and black-and-white or coloured, currency (€ or ₴), data folder.                                                                                                           |
+| Section                 | What it does |
+| ----------------------- | ------------ |
+| **Home**                | Total money, month result, subscribers, applications this week; today's tasks and habits, latest operations, payments due this week, budget warnings, earned game time, channel reach. |
+| **Finance**             | Operations (income/expenses with categories, project link, month overview, 12-month chart, CSV export), **budgets** per category, **recurring payments** that are written automatically on their day, **savings goals** with the monthly amount needed. Currency: € or ₴. |
+| **Accounts**            | Where the money is: Trust Wallet (crypto, in $/USDT), Ukrainian card (₴), German card (€) and any other. Balances are typed in; the total is converted with official NBU rates (or rates typed by hand) and tracked over time. |
+| **Career**              | Ausbildung / job applications board (want to send → sent → interview → offer / rejected), weekly goal, follow-up reminders a week after sending, Bewerbung documents checklist, job boards, Grok helpers for the Anschreiben, follow-up e-mails and interview practice. |
+| **Projects**            | Own apps and projects: income and expenses linked from Finance, hours spent, profit per hour, milestones, Grok monetization ideas. |
+| **Telegram channels**   | Any number of public channels: analytics from `t.me/s/<channel>` (subscribers, reach, ERR, best time to post, top posts), a **content plan** (week strip, ideas, published, drafts with Grok) and **ads** (bought and sold posts, cost per subscriber, optional finance entries). |
+| **Tasks & habits**      | Tasks by date (overdue, today, tomorrow, later) and daily habits with streaks. |
+| **Notes**               | Quick notes with search and pinning. |
+| **Games**               | Game time is earned by being productive — done tasks, sent applications, habit check-ins, project milestones — and spent by logging sessions; spending in the «Игры» category. |
+| **Grok**                | Two modes: grok.com inside the app with your own subscription (sign in once, the session is kept, no API costs; quick prompts with your numbers are pasted into its message box), or a streaming chat through the xAI API with your own key (encrypted with Windows DPAPI). |
+| **Settings**            | Grok mode, key and model, light/dark theme, pets on/off and black-and-white or coloured, currency, data folder. |
 
 ## Download
 
@@ -25,7 +30,7 @@ Grab `Planner-<version>-portable.exe` from the [latest release](https://github.c
 npm install
 npm start            # npm run dev opens DevTools
 npx electron scripts/make-icons.js   # build/icon.svg → icon.png + icon.ico
-npm test             # unit tests: finance math, channel parser, data migration, Grok streaming
+npm test             # unit tests: finance math, channel parser, accounts, recurring payments, budgets, goals, habits, career, ads, projects, game time, data migration, Grok streaming
 npm run dist:win     # portable .exe → dist/Planner-<version>-portable.exe
 npx electron scripts/screenshots.js shots durov   # demo data + screenshots of every screen
 ```

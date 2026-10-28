@@ -6,6 +6,7 @@ import { markdown } from '../markdown.js';
 import { today, thisMonth, shiftMonth, monthTitle } from '../dates.js';
 import { totals, inMonth, byCategory } from '../finance-calc.js';
 import { summaryForAI } from '../tg.js';
+import { careerStats, projectStats, netWorth } from '../planner-calc.js';
 import { go } from '../app.js';
 import { showGrokWeb, fillGrokWeb, grokWeb } from '../grok-web.js';
 
@@ -20,7 +21,7 @@ const ERRORS = {
 
 const SYSTEM =
   'Ты — Grok, личный помощник в приложении-планере. Отвечай по-русски, по делу и конкретно, без воды. ' +
-  'Пользователь ведёт учёт доходов и расходов и развивает свои Telegram-каналы. Когда даёшь советы — опирайся на цифры, ' +
+  'Пользователь живёт в Германии, ищет Ausbildung и работу, ведёт учёт денег, развивает свои Telegram-каналы и хочет зарабатывать на своих приложениях и проектах. Когда даёшь советы — опирайся на цифры, ' +
   'которые он прислал, и предлагай конкретные шаги. Форматируй ответы коротким Markdown (заголовки, списки).';
 
 let hasKey = null;
@@ -62,6 +63,40 @@ const QUICK = [
       state.data.channels.length
         ? `Предложи по 7 идей для постов на ближайшие две недели для каждого моего канала, в их стиле. Учитывай, какие посты набрали больше охвата.\n\n${channelsSummary()}`
         : 'Предложи 10 идей для постов в Telegram-канал. Сначала спроси меня, о чём канал, если это непонятно.',
+  ],
+  [
+    'Поиск Ausbildung',
+    () => {
+      const apps = state.data.career.applications;
+      const st = careerStats(apps, today());
+      const list = apps.map((a) => `- ${a.company}: ${a.position} (${a.kind}), статус ${a.status}${a.sentAt ? `, отправлено ${a.sentAt}` : ''}`).join('\n');
+      return (
+        'Я ищу Ausbildung/работу в Германии. Помоги с планом поиска: какие профессии мне подходят и востребованы, где искать, как улучшить Bewerbung, ' +
+        `что делать на этой неделе. Сейчас: отправлено ${st.sent}, на этой неделе ${st.week}, отвечают ${Math.round(st.responseRate * 100)}%, собеседований ${st.interviews}.\n${list || 'Откликов пока нет.'}\nСначала спроси, что мне интересно и какой у меня уровень немецкого.`
+      );
+    },
+  ],
+  [
+    'Заработок на проектах',
+    () => {
+      const ps = state.data.projects.map((p) => {
+        const st = projectStats(p, state.data.finance);
+        return `- ${p.name} (${p.status}): ${p.description || ''}; прибыль ${money(st.profit)}, часов ${st.hours}; монетизация: ${p.money || 'нет'}`;
+      });
+      return (
+        'Хочу зарабатывать на своих приложениях и проектах, параллельно с поиском Ausbildung в Германии. ' +
+        `Мои проекты:\n${ps.join('\n') || '(пока не внёс — спроси меня)'}\n` +
+        'Предложи, на чём сфокусироваться, 5 реалистичных способов монетизации, как оформить доход в Германии (Kleingewerbe, налоги, что можно на Ausbildung) и план на месяц.'
+      );
+    },
+  ],
+  [
+    'Разбор денег',
+    () => {
+      const { accounts, rates, settings } = state.data;
+      const nw = netWorth(accounts, rates, settings.currency);
+      return `Вот где лежат мои деньги:\n${accounts.map((a) => `- ${a.name}: ${a.balance} ${a.currency}`).join('\n')}\nВсего ≈ ${money(nw.total)}.\n${financeSummary()}\nСкажи, как лучше распределить деньги между картами и криптой, какую подушку держать и сколько откладывать. Без инвестиционных обещаний.`;
+    },
   ],
   ['План на неделю', () => 'Помоги составить план на неделю: спроси, какие у меня цели и дела, и разложи их по дням.'],
 ];

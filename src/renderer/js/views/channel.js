@@ -7,10 +7,30 @@ import { lineChart } from '../charts.js';
 import { today, prettyDate, WEEKDAYS } from '../dates.js';
 import { parseChannelPage, mergePosts, addSnapshot, postList, windowStats, subscriberDelta, timing, summaryForAI } from '../tg.js';
 import { go } from '../app.js';
+import { planTab, adsTab } from './channel-extra.js';
 
 const STALE_MS = 3 * 3600 * 1000;
 let loading = false;
 let adding = false;
+let chTab = 'stats';
+
+const CH_TABS = [
+  ['stats', 'Аналитика'],
+  ['plan', 'Контент-план'],
+  ['ads', 'Реклама'],
+];
+
+function channelTabs() {
+  return h(
+    'div',
+    { class: 'seg', style: { marginBottom: '18px' } },
+    CH_TABS.map(([k, label]) => h('button', { class: chTab === k ? 'on' : '', onclick: () => ((chTab = k), rerender()) }, label)),
+  );
+}
+
+export function openChannelTab(tab) {
+  chTab = tab;
+}
 
 const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
 
@@ -242,10 +262,7 @@ export function channelView() {
   const top = [...posts].sort((a, b) => b.views - a.views).slice(0, 7);
   const fmtDelta = (d) => (d ? `${d.delta >= 0 ? '+' : '−'}${compact(Math.abs(d.delta))} с ${prettyDate(d.from)}` : 'динамика появится со временем');
 
-  return h(
-    'div',
-    { class: 'page' },
-    h(
+  const head = h(
       'div',
       { class: 'page-head' },
       h(
@@ -280,8 +297,15 @@ export function channelView() {
         h('button', { class: 'btn', disabled: loading, onclick: () => refreshChannel(ch.username) }, icon('refresh', 16), loading ? 'Обновляю…' : 'Обновить'),
         h('button', { class: 'btn primary', disabled: !posts.length, onclick: askGrokAboutChannel }, icon('spark', 16), 'Разбор от Grok'),
       ),
-    ),
+    );
+  if (chTab !== 'stats') return h('div', { class: 'page' }, head, channelSwitcher(ch), channelTabs(), ...(chTab === 'plan' ? planTab(ch) : adsTab(ch)));
+
+  return h(
+    'div',
+    { class: 'page' },
+    head,
     channelSwitcher(ch),
+    channelTabs(),
     h(
       'div',
       { class: 'grid cols-4', style: { marginBottom: '16px' } },
