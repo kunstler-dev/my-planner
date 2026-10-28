@@ -8,7 +8,8 @@ import { postList, subscriberDelta } from '../tg.js';
 import { entryModal, entryRow } from './finance.js';
 import { askGrokAboutChannel, activeChannel } from './channel.js';
 import { go } from '../app.js';
-import { netWorth, upcoming, careerStats, playBalance, minutesText, budgetStatus } from '../planner-calc.js';
+import { netWorth, upcoming, careerStats, budgetStatus } from '../planner-calc.js';
+import { gamesCard } from './games.js';
 import { habitRow } from './tasks.js';
 
 function greeting() {
@@ -120,7 +121,6 @@ export function homeView() {
   const recent = [...state.data.finance].sort((a, b) => b.date.localeCompare(a.date) || (b.id > a.id ? 1 : -1)).slice(0, 5);
   const nw = netWorth(state.data.accounts, state.data.rates, state.data.settings.currency);
   const cs = careerStats(state.data.career.applications, today());
-  const pb = playBalance(state.data, today());
   const soon = upcoming(state.data.recurring, today(), 7);
   const overBudget = budgetStatus(inMonth(state.data.finance, thisMonth()), state.data.budgets).filter((b) => b.share >= 0.9);
 
@@ -185,13 +185,7 @@ export function homeView() {
       h(
         'div',
         { class: 'stack' },
-        h(
-          'button',
-          { class: 'card stat dark', style: { textAlign: 'left', cursor: 'pointer' }, onclick: () => go('play') },
-          h('div', { class: 'stat-label' }, icon('gamepad', 16), 'Игровое время'),
-          h('div', { class: 'stat-value' }, pb.balance > 0 ? minutesText(pb.balance) : '0 мин'),
-          h('div', { class: 'stat-note' }, pb.balance < 0 ? `долг ${minutesText(-pb.balance)} — сначала дела` : `заработано за неделю ${minutesText(pb.earned)}`),
-        ),
+        gamesCard(),
         card(
         ch ? `@${ch.username}` : 'Telegram-канал',
         h(

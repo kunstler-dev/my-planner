@@ -1,7 +1,7 @@
 // Settings: Grok key and model, currency, theme, pets, data folder.
 import { state, update } from '../state.js';
 import { h, card, toast } from '../ui.js';
-import { setTheme } from '../app.js';
+import { setTheme, applyMedia } from '../app.js';
 import { resetGrokKeyCache } from './grok.js';
 
 let models = null;
@@ -12,6 +12,45 @@ function seg(options, value, onPick) {
     'div',
     { class: 'seg' },
     options.map(([k, label]) => h('button', { type: 'button', class: value === k ? 'on' : '', onclick: () => onPick(k) }, label)),
+  );
+}
+
+/** Choose / remove a background or banner file (copied into the data folder, never uploaded anywhere). */
+function mediaRow(kind, title, note) {
+  const s = state.data.settings;
+  const current = s[kind];
+  return settingRow(
+    title,
+    current ? `${note}. Сейчас: свой файл` : note,
+    h(
+      'div',
+      { class: 'row' },
+      h(
+        'button',
+        {
+          class: 'btn',
+          onclick: async () => {
+            const name = await window.api.media.choose(kind);
+            if (!name) return;
+            update((d) => (d.settings[kind] = name));
+            toast(kind === 'banner' ? 'Баннер обновлён' : 'Фон обновлён');
+          },
+        },
+        current ? 'Заменить' : 'Выбрать файл',
+      ),
+      current &&
+        h(
+          'button',
+          {
+            class: 'btn ghost',
+            onclick: async () => {
+              await window.api.media.remove(kind);
+              update((d) => (d.settings[kind] = ''));
+            },
+          },
+          'Убрать',
+        ),
+    ),
   );
 }
 
@@ -161,6 +200,25 @@ export function settingsView() {
           'div',
           { class: 'list' },
           settingRow('Тема', null, seg([['light', 'Светлая'], ['dark', 'Тёмная']], s.theme, setTheme)),
+          mediaRow('background', 'Фон приложения', 'Картинка на заднем фоне (JPG, PNG, WebP, GIF)'),
+          s.background &&
+            settingRow(
+              'Затемнение фона',
+              'Чем больше — тем спокойнее фон и читабельнее текст',
+              h('input', {
+                type: 'range',
+                class: 'range',
+                min: 0,
+                max: 95,
+                value: s.veil ?? 70,
+                oninput: (e) => {
+                  state.data.settings.veil = Number(e.target.value);
+                  applyMedia();
+                },
+                onchange: () => update(() => {}, { silent: true }),
+              }),
+            ),
+          mediaRow('banner', 'Баннер в меню', 'Видео, GIF или картинка за логотипом слева сверху (MP4, WebM, GIF, PNG, JPG)'),
           settingRow('Питомцы', 'Сефирка, Гудсик и корги Бублик внизу меню', seg([[true, 'Показывать'], [false, 'Скрыть']], s.pets !== false, (v) => update((d) => (d.settings.pets = v)))),
           s.pets !== false && settingRow('Цвет питомцев', 'Чёрно-белые под стиль приложения или в цвете', seg([[false, 'Ч/б'], [true, 'Цветные']], !!s.petsColor, (v) => update((d) => (d.settings.petsColor = v)))),
           settingRow(

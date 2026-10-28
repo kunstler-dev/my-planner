@@ -13,6 +13,15 @@ contextBridge.exposeInMainWorld('api', {
   saveFile: (name, content) => ipcRenderer.invoke('file:save', { name, content }),
   tgFetch: (username, before) => ipcRenderer.invoke('tg:fetch', { username, before }),
   fetchRates: () => ipcRenderer.invoke('rates:fetch'),
+  media: {
+    choose: (kind) => ipcRenderer.invoke('media:choose', kind),
+    remove: (kind) => ipcRenderer.invoke('media:remove', kind),
+    list: () => ipcRenderer.invoke('media:list'),
+  },
+  steam: {
+    search: (term) => ipcRenderer.invoke('steam:search', term),
+    prices: (ids) => ipcRenderer.invoke('steam:prices', ids),
+  },
   grokWeb: {
     logout: () => ipcRenderer.invoke('grokweb:logout'),
   },

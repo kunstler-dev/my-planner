@@ -28,7 +28,7 @@ function defaultDocs() {
 function defaultData() {
   return {
     version: 3,
-    settings: { theme: 'light', currency: '€', pets: true, petsColor: false, grokModel: 'grok-4', grokMode: 'web', activeChannel: '' },
+    settings: { theme: 'light', currency: '€', pets: true, petsColor: false, grokModel: 'grok-4', grokMode: 'web', activeChannel: '', background: '', banner: '', veil: 70 },
     // Units of each currency per 1 €; refreshed from the NBU or typed by hand.
     rates: { '€': 1, '₴': 48, $: 1.08, updatedAt: '' },
     accounts: defaultAccounts(),
@@ -44,7 +44,9 @@ function defaultData() {
     ads: [],
     career: { applications: [], docs: defaultDocs(), weeklyGoal: 5 },
     projects: [],
-    play: { sessions: [], rewards: { task: 15, application: 30, habit: 10, milestone: 30 } },
+    wishlist: [],
+    ranks: { dota: { goal: null, entries: [] }, faceit: { goal: null, entries: [] }, deadlock: { goal: null, entries: [] } },
+    clips: [],
     chat: [],
   };
 }
@@ -88,7 +90,11 @@ function normalize(raw) {
       docs: Array.isArray(raw.career?.docs) ? raw.career.docs : d.career.docs,
     },
     projects: arr(raw.projects),
-    play: { sessions: arr(raw.play?.sessions), rewards: { ...d.play.rewards, ...(raw.play?.rewards || {}) } },
+    wishlist: arr(raw.wishlist),
+    ranks: Object.fromEntries(
+      Object.entries(d.ranks).map(([k, v]) => [k, { goal: raw.ranks?.[k]?.goal ?? v.goal, entries: arr(raw.ranks?.[k]?.entries) }]),
+    ),
+    clips: arr(raw.clips),
     chat: arr(raw.chat),
   };
 }

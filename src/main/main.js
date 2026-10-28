@@ -1,6 +1,7 @@
 // Electron main process: window, data store, Grok (API streaming and the grok.com webview), Telegram page
-// fetch, file export.
-const { app, BrowserWindow, ipcMain, dialog, nativeTheme, shell, session } = require('electron');
+// fetch, Steam prices, the user's background/banner media, file export.
+const { app, BrowserWindow, ipcMain, dialog, nativeTheme, shell, session, protocol, net } = require('electron');
+const { pathToFileURL } = require('url');
 const fs = require('fs');
 const path = require('path');
 const { createStore } = require('./store');
@@ -12,6 +13,16 @@ if (process.env.PLANNER_DATA_DIR) app.setPath('userData', process.env.PLANNER_DA
 app.commandLine.appendSwitch('enable-unsafe-swiftshader');
 
 if (!app.requestSingleInstanceLock()) app.quit();
+
+// The user's own background picture and banner video live in userData/media and are served as planner-media://media/<file>
+// (never bundled with the app). Must be registered before the app is ready.
+protocol.registerSchemesAsPrivileged([{ scheme: 'planner-media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
+const MEDIA_TYPES = {
+  background: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
+  banner: ['mp4', 'webm', 'gif', 'png', 'jpg', 'jpeg', 'webp'],
+};
+const mediaDir = () => path.join(app.getPath('userData'), 'media');
+const STEAM = 'https://store.steampowered.com/api';
 
 let win;
 let store;
@@ -121,6 +132,60 @@ app.whenReady().then(() => {
   store = createStore(dir);
   secrets = createSecrets(dir);
   session.fromPartition(GROK_PARTITION).setUserAgent(CHROME_UA);
+
+  protocol.handle('planner-media', (req) => {
+    const name = path.basename(decodeURIComponent(new URL(req.url).pathname));
+    const file = path.join(mediaDir(), name);
+    if (!name || !fs.existsSync(file)) return new Response('not found', { status: 404 });
+    return net.fetch(pathToFileURL(file).toString());
+  });
+  // Picks a file and copies it into userData/media; returns the stored file name.
+  ipcMain.handle('media:choose', async (_e, kind) => {
+    const exts = MEDIA_TYPES[kind];
+    if (!exts) return null;
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: kind === 'banner' ? 'Баннер: видео, GIF или картинка' : 'Фон: картинка',
+      properties: ['openFile'],
+      filters: [{ name: kind === 'banner' ? 'Видео и картинки' : 'Картинки', extensions: exts }],
+    });
+    if (canceled || !filePaths[0]) return null;
+    const ext = path.extname(filePaths[0]).slice(1).toLowerCase();
+    if (!exts.includes(ext)) return null;
+    fs.mkdirSync(mediaDir(), { recursive: true });
+    for (const old of fs.readdirSync(mediaDir())) if (old.startsWith(`${kind}-`)) fs.unlinkSync(path.join(mediaDir(), old));
+    const name = `${kind}-${Date.now()}.${ext}`;
+    fs.copyFileSync(filePaths[0], path.join(mediaDir(), name));
+    return name;
+  });
+  ipcMain.handle('media:remove', (_e, kind) => {
+    if (!MEDIA_TYPES[kind] || !fs.existsSync(mediaDir())) return true;
+    for (const old of fs.readdirSync(mediaDir())) if (old.startsWith(`${kind}-`)) fs.unlinkSync(path.join(mediaDir(), old));
+    return true;
+  });
+  /** Finds a stored media file left from before (e.g. copied in by hand) so settings can pick it up. */
+  ipcMain.handle('media:list', () => (fs.existsSync(mediaDir()) ? fs.readdirSync(mediaDir()) : []));
+
+  // Steam store: search by name and current prices in euro (German store), no key needed.
+  ipcMain.handle('steam:search', async (_e, term) => {
+    try {
+      const res = await fetch(`${STEAM}/storesearch/?term=${encodeURIComponent(String(term).slice(0, 80))}&l=russian&cc=DE`);
+      if (!res.ok) return { ok: false, error: 'http' };
+      return { ok: true, items: (await res.json()).items || [] };
+    } catch (err) {
+      return { ok: false, error: 'network', message: err.message };
+    }
+  });
+  ipcMain.handle('steam:prices', async (_e, ids) => {
+    const list = (ids || []).map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 100);
+    if (!list.length) return { ok: true, prices: {} };
+    try {
+      const res = await fetch(`${STEAM}/appdetails?appids=${list.join(',')}&cc=de&filters=price_overview`);
+      if (!res.ok) return { ok: false, error: 'http' };
+      return { ok: true, prices: await res.json() };
+    } catch (err) {
+      return { ok: false, error: 'network', message: err.message };
+    }
+  });
   ipcMain.handle('grokweb:logout', async () => {
     await session.fromPartition(GROK_PARTITION).clearStorageData();
     return true;

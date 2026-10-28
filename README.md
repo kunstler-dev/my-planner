@@ -16,9 +16,9 @@ Russian. All data stays on the local machine; there is no sync.
 | **Telegram channels**   | Any number of public channels: analytics from `t.me/s/<channel>` (subscribers, reach, ERR, best time to post, top posts), a **content plan** (week strip, ideas, published, drafts with Grok) and **ads** (bought and sold posts, cost per subscriber, optional finance entries). |
 | **Tasks & habits**      | Tasks by date (overdue, today, tomorrow, later) and daily habits with streaks. |
 | **Notes**               | Quick notes with search and pinning. |
-| **Games**               | Game time is earned by being productive — done tasks, sent applications, habit check-ins, project milestones — and spent by logging sessions; spending in the «Игры» category. |
+| **Games**               | **Steam wishlist** (search the store or paste a link; euro prices from the German store checked daily, discounts, lowest price seen, target price), **ranks** (Dota 2 MMR with the approximate medal, FACEIT ELO and level, Deadlock rank up to Eternus — history, goals, notes after games, Grok finds repeated mistakes), **content** (game clips from idea to published, views on TikTok / Shorts / YouTube, Grok scripts and ideas). |
 | **Grok**                | Two modes: grok.com inside the app with your own subscription (sign in once, the session is kept, no API costs; quick prompts with your numbers are pasted into its message box), or a streaming chat through the xAI API with your own key (encrypted with Windows DPAPI). |
-| **Settings**            | Grok mode, key and model, light/dark theme, pets on/off and black-and-white or coloured, currency, data folder. |
+| **Settings**            | Grok mode, key and model, light/dark theme, your own background picture (with a dimming slider) and banner video/GIF behind the logo — stored in the data folder, never in the repo, pets on/off and black-and-white or coloured, currency, data folder. |
 
 ## Download
 
@@ -30,12 +30,12 @@ Grab `Planner-<version>-portable.exe` from the [latest release](https://github.c
 npm install
 npm start            # npm run dev opens DevTools
 npx electron scripts/make-icons.js   # build/icon.svg → icon.png + icon.ico
-npm test             # unit tests: finance math, channel parser, accounts, recurring payments, budgets, goals, habits, career, ads, projects, game time, data migration, Grok streaming
+npm test             # unit tests: finance math, channel parser, accounts, recurring payments, budgets, goals, habits, career, ads, projects, Steam prices, ranks, clips, data migration, Grok streaming
 npm run dist:win     # portable .exe → dist/Planner-<version>-portable.exe
 npx electron scripts/screenshots.js shots durov   # demo data + screenshots of every screen
 ```
 
-Data lives in `%APPDATA%\Planner` (`data.json`, `data.backup.json`, `secret.bin` with the xAI key).
+Data lives in `%APPDATA%\Planner` (`data.json`, `data.backup.json`, `secret.bin` with the xAI key, `media/` with the background and banner).
 
 ## Stack
 

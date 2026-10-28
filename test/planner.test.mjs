@@ -16,8 +16,6 @@ import {
   careerStats,
   adStats,
   projectStats,
-  playBalance,
-  minutesText,
 } from '../src/renderer/js/planner-calc.js';
 
 const rates = { '€': 1, '₴': 50, $: 1.25 };
@@ -158,23 +156,3 @@ test('career, ads and project stats', () => {
   assert.deepEqual([p.profit, p.hours, p.perHour, p.milestonesDone], [150, 15, 10, 1]);
 });
 
-test('game time is earned by tasks, applications, habits and milestones', () => {
-  const data = {
-    play: { rewards: { task: 15, application: 30, habit: 10, milestone: 30 }, sessions: [{ date: '2026-10-27', minutes: 40 }, { date: '2026-10-20', minutes: 500 }] },
-    tasks: [
-      { done: true, doneAt: '2026-10-27' },
-      { done: true, doneAt: '2026-10-19' },
-      { done: false },
-    ],
-    career: { applications: [{ sentAt: '2026-10-28' }, { sentAt: '2026-10-25' }] },
-    habits: [{ days: ['2026-10-26', '2026-10-27', '2026-10-24'] }],
-    projects: [{ milestones: [{ done: true, doneAt: '2026-10-28' }] }],
-  };
-  const b = playBalance(data, '2026-10-28');
-  assert.deepEqual(b.parts, { tasks: 15, applications: 30, habits: 20, milestones: 30 });
-  assert.equal(b.earned, 95);
-  assert.equal(b.played, 40);
-  assert.equal(b.balance, 55);
-  assert.equal(minutesText(95), '1 ч 35 мин');
-  assert.equal(minutesText(-20), '−20 мин');
-});

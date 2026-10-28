@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; frame-src https://grok.com"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: planner-media: https://shared.akamai.steamstatic.com https://cdn.akamai.steamstatic.com https://shared.cloudflare.steamstatic.com https://cdn.cloudflare.steamstatic.com https://shared.fastly.steamstatic.com https://shared.steamstatic.com; media-src planner-media:; connect-src 'none'; frame-src https://grok.com"
     />
     <title>Planner</title>
     <link rel="stylesheet" href="css/styles.css" />
@@ -12,7 +12,7 @@
   <body>
     <div class="app">
       <aside class="sidebar">
-        <div class="brand"><img class="brand-icon" src="assets/icon.png" alt="" width="26" height="26" /> Planner</div>
+        <div class="brand" id="brand"><img class="brand-icon" src="assets/icon.png" alt="" width="26" height="26" /> <span>Planner</span></div>
         <nav id="nav"></nav>
         <div id="pets-slot"></div>
         <div id="nav-bottom"></div>

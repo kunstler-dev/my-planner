@@ -1,5 +1,5 @@
-// Pure calculations for accounts, recurring payments, budgets, goals, habits, career, ads, projects and
-// game-time rewards (unit-tested). Dates are local 'YYYY-MM-DD' strings.
+// Pure calculations for accounts, recurring payments, budgets, goals, habits, career, ads and projects
+// (unit-tested). Dates are local 'YYYY-MM-DD' strings.
 
 const DAY = 86400000;
 const pad = (n) => String(n).padStart(2, '0');
@@ -203,34 +203,6 @@ export function projectStats(project, finance) {
     milestonesDone: ms.filter((m) => m.done).length,
     milestones: ms.length,
   };
-}
-
-// ---- game time earned by being productive ----
-
-/**
- * Minutes of game time earned this week: done tasks, sent applications, habit check-ins and finished
- * project milestones, minus the minutes already played this week.
- */
-export function playBalance(data, todayStr) {
-  const ws = weekStart(todayStr);
-  const r = data.play.rewards;
-  const inWeek = (d) => d && d >= ws && d <= todayStr;
-  const parts = {
-    tasks: data.tasks.filter((t) => t.done && inWeek(t.doneAt)).length * r.task,
-    applications: data.career.applications.filter((a) => inWeek(a.sentAt)).length * r.application,
-    habits: data.habits.reduce((s, h) => s + (h.days || []).filter(inWeek).length, 0) * r.habit,
-    milestones: data.projects.reduce((s, p) => s + (p.milestones || []).filter((m) => m.done && inWeek(m.doneAt)).length, 0) * r.milestone,
-  };
-  const earned = parts.tasks + parts.applications + parts.habits + parts.milestones;
-  const played = data.play.sessions.filter((s) => inWeek(s.date)).reduce((s, x) => s + (Number(x.minutes) || 0), 0);
-  return { earned, played, balance: earned - played, parts, weekStart: ws };
-}
-
-export function minutesText(min) {
-  const sign = min < 0 ? '−' : '';
-  const m = Math.abs(Math.round(min));
-  const h = Math.floor(m / 60);
-  return `${sign}${h ? `${h} ч ` : ''}${m % 60} мин`;
 }
 
 export { DAY };

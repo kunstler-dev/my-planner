@@ -9,6 +9,17 @@ const out = path.resolve(process.argv[2] || 'shots');
 const channels = (process.argv[3] || 'durov').split(',');
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'planner-shots-'));
 process.env.PLANNER_DATA_DIR = dataDir;
+// Optional background / banner files: PLANNER_SHOT_BG and PLANNER_SHOT_BANNER (copied like the settings buttons do).
+for (const [kind, env] of [
+  ['background', 'PLANNER_SHOT_BG'],
+  ['banner', 'PLANNER_SHOT_BANNER'],
+]) {
+  const src = process.env[env];
+  if (src && fs.existsSync(src)) {
+    fs.mkdirSync(path.join(dataDir, 'media'), { recursive: true });
+    fs.copyFileSync(src, path.join(dataDir, 'media', `${kind}-1${path.extname(src).toLowerCase()}`));
+  }
+}
 
 function demoData() {
   const pad = (n) => String(n).padStart(2, '0');
@@ -82,7 +93,20 @@ function demoData() {
       { id: 'pr1', name: 'Planner', status: 'active', description: 'Десктопный планер', money: 'Продажа шаблонов', hours: [{ hours: 12, date: day(2) }], milestones: [{ id: 'm1', title: 'Релиз 1.3', done: true, doneAt: day(0) }, { id: 'm2', title: 'Сайт', done: false }] },
       { id: 'pr2', name: 'ELT-бот', status: 'launched', description: 'Telegram Mini App', money: 'Реклама, подписки', hours: [{ hours: 40, date: day(6) }], milestones: [] },
     ],
-    play: { sessions: [{ id: 's1', game: 'Dota 2', minutes: 45, date: day(0) }], rewards: { task: 15, application: 30, habit: 10, milestone: 30 } },
+    wishlist: [
+      { id: 1245620, name: 'ELDEN RING', image: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1245620/capsule_231x87.jpg', target: 40, history: [] },
+      { id: 1091500, name: 'Cyberpunk 2077', image: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1091500/capsule_231x87.jpg', target: null, history: [] },
+    ],
+    ranks: {
+      dota: { goal: 4000, entries: [{ id: 'k1', date: day(40), value: 3050 }, { id: 'k2', date: day(20), value: 3180, note: 'Проиграл линию, мало стакал' }, { id: 'k3', date: day(2), value: 3320, note: 'Хорошо зашёл Pudge' }] },
+      faceit: { goal: 1351, entries: [{ id: 'f1', date: day(30), value: 1120 }, { id: 'f2', date: day(3), value: 1205 }] },
+      deadlock: { goal: 71, entries: [{ id: 'l1', date: day(25), value: 50 }, { id: 'l2', date: day(1), value: 56 }] },
+    },
+    clips: [
+      { id: 'v1', title: 'Хук через всю карту', game: 'Dota 2', status: 'published', date: day(5), views: { tiktok: 12400, shorts: 3100, youtube: 0 } },
+      { id: 'v2', title: 'Эйс с дигла', game: 'CS2', status: 'edit', views: {} },
+      { id: 'v3', title: 'Топ-5 фейлов недели', game: 'Deadlock', status: 'idea', views: {} },
+    ],
   };
   finance.push({ id: 'pf1', type: 'income', amount: 300, category: 'Продажи', date: day(3), note: 'Заказ', projectId: 'pr1' });
   return { ...v3, version: 1, settings: { theme: 'light', currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
@@ -146,12 +170,12 @@ app.on('browser-window-created', (_e, win) => {
           ['Telegram-каналы', 'channel', ['Контент-план', 'Реклама', 'Аналитика']],
           ['Задачи и привычки', 'tasks'],
           ['Заметки', 'notes'],
-          ['Игры', 'play'],
+          ['Игры', 'games', ['Ранги', 'Контент', 'Вишлист Steam']],
           ['Grok', 'grok'],
           ['Настройки', 'settings'],
         ];
         for (const [view, name, tabs] of views) {
-          if (theme === 'dark' && !['home', 'finance', 'career', 'grok'].includes(name)) continue;
+          if (theme === 'dark' && !['home', 'finance', 'career', 'games', 'settings'].includes(name)) continue;
           await click(view);
           if (name === 'grok') await wait(6000);
           await shot(`${name}-${theme}`);

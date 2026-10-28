@@ -98,7 +98,7 @@ export function tasksView() {
   return h(
     'div',
     { class: 'page' },
-    h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Задачи и привычки'), h('div', { class: 'sub' }, 'Дела по датам и ежедневные привычки — за каждое выполненное копится игровое время'))),
+    h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Задачи и привычки'), h('div', { class: 'sub' }, 'Дела по датам и ежедневные привычки'))),
     h(
       'div',
       { class: 'grid cols-2', style: { alignItems: 'start' } },

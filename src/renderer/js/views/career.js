@@ -74,7 +74,6 @@ function move(a, dir) {
     const i = d.career.applications.findIndex((x) => x.id === a.id);
     d.career.applications[i] = withStatus(d.career.applications[i], next);
   });
-  if (next === 'sent') toast('+30 мин игрового времени за отклик 🎮');
 }
 
 export function anschreibenPrompt(a) {

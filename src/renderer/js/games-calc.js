@@ -1,0 +1,112 @@
+// Pure helpers for the Games tab (unit-tested): Steam wishlist prices, Dota MMR / FACEIT / Deadlock ranks, game clips.
+
+// ---- Steam wishlist ----
+
+/** «https://store.steampowered.com/app/570/Dota_2/» or «570» → 570; anything else → null. */
+export function parseSteamAppId(input) {
+  const s = String(input || '').trim();
+  const m = s.match(/store\.steampowered\.com\/app\/(\d+)/) || s.match(/^(\d{1,8})$/);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Applies Steam's price_overview (cents) to a wishlist item: current/initial price, discount, one history point per
+ * day and the lowest price seen. A free or unreleased game (no overview) keeps price null.
+ */
+export function applyPrice(item, overview, date) {
+  if (!overview) return { ...item, price: null, initial: null, discount: 0, updatedAt: date };
+  const price = overview.final / 100;
+  const history = (item.history || []).filter((h) => h.date !== date);
+  history.push({ date, price });
+  history.sort((a, b) => a.date.localeCompare(b.date));
+  const lowest = Math.min(price, ...history.map((h) => h.price));
+  return { ...item, price, initial: overview.initial / 100, discount: overview.discount_percent || 0, lowest, history: history.slice(-180), updatedAt: date };
+}
+
+export function wishlistSummary(items) {
+  const priced = items.filter((i) => i.price != null);
+  return {
+    total: priced.reduce((s, i) => s + i.price, 0),
+    saving: priced.reduce((s, i) => s + Math.max(0, (i.initial ?? i.price) - i.price), 0),
+    onSale: priced.filter((i) => i.discount > 0).length,
+    atTarget: priced.filter((i) => i.target != null && i.target > 0 && i.price <= i.target).length,
+  };
+}
+
+// ---- ranks ----
+
+const MEDALS = ['Рекрут', 'Страж', 'Рыцарь', 'Герой', 'Легенда', 'Властелин', 'Божество'];
+
+/** Approximate Dota medal for a solo MMR (≈154 MMR per star up to Ancient, 200 per Divine star, Titan from 5620). */
+export function dotaMedal(mmr) {
+  const v = Number(mmr) || 0;
+  if (v >= 5620) return 'Титан';
+  if (v >= 4620) return `Божество ${Math.min(5, Math.floor((v - 4620) / 200) + 1)}`;
+  const star = Math.floor(v / 154);
+  return `${MEDALS[Math.min(5, Math.floor(star / 5))]} ${(star % 5) + 1}`;
+}
+
+const FACEIT_LEVELS = [500, 750, 900, 1050, 1200, 1350, 1530, 1750, 2000];
+
+/** FACEIT level (1–10) for an ELO. */
+export function faceitLevel(elo) {
+  const v = Number(elo) || 0;
+  const i = FACEIT_LEVELS.findIndex((max) => v <= max);
+  return i < 0 ? 10 : i + 1;
+}
+
+/** ELO left to the next FACEIT level (null at level 10). */
+export function faceitToNext(elo) {
+  const lvl = faceitLevel(elo);
+  return lvl >= 10 ? null : FACEIT_LEVELS[lvl - 1] + 1 - elo;
+}
+
+export const DEADLOCK_TIERS = ['Obscurus', 'Initiate', 'Seeker', 'Acolyte', 'Sentinel', 'Mystic', 'Ritualist', 'Emissary', 'Oracle', 'Phantom', 'Ascendant', 'Eternus'];
+
+/** Deadlock rank as one number for charts: tier 0–11 × 6 subranks (Eternus 6 = 71). */
+export const deadlockValue = (tier, sub) => tier * 6 + (Math.min(6, Math.max(1, sub)) - 1);
+
+export function deadlockName(value) {
+  const v = Math.max(0, Math.round(value));
+  const tier = Math.min(11, Math.floor(v / 6));
+  return `${DEADLOCK_TIERS[tier]} ${(v % 6) + 1}`;
+}
+
+/** Track numbers for a list of entries [{ date, value }]: current, change over 30 days, distance to goal. */
+export function rankProgress(entries, goal, todayStr) {
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  if (!sorted.length) return { current: null, change30: null, toGoal: null, best: null };
+  const current = sorted.at(-1).value;
+  const monthAgo = new Date(new Date(`${todayStr}T12:00`).getTime() - 30 * 86400000).toISOString().slice(0, 10);
+  const base = [...sorted].reverse().find((e) => e.date <= monthAgo) || sorted[0];
+  return {
+    current,
+    change30: base === sorted.at(-1) ? null : current - base.value,
+    toGoal: goal != null ? goal - current : null,
+    best: Math.max(...sorted.map((e) => e.value)),
+  };
+}
+
+// ---- game clips (content) ----
+
+export const CLIP_STATUSES = [
+  ['idea', 'Идея'],
+  ['record', 'Записать'],
+  ['edit', 'Монтаж'],
+  ['published', 'Опубликован'],
+];
+export const PLATFORMS = [
+  ['tiktok', 'TikTok'],
+  ['shorts', 'Shorts'],
+  ['youtube', 'YouTube'],
+];
+
+export const clipViews = (c) => PLATFORMS.reduce((s, [k]) => s + (Number(c.views?.[k]) || 0), 0);
+
+export function clipStats(clips) {
+  const published = clips.filter((c) => c.status === 'published');
+  const byPlatform = Object.fromEntries(PLATFORMS.map(([k]) => [k, published.reduce((s, c) => s + (Number(c.views?.[k]) || 0), 0)]));
+  const total = Object.values(byPlatform).reduce((s, v) => s + v, 0);
+  const best = [...published].sort((a, b) => clipViews(b) - clipViews(a))[0] || null;
+  return { published: published.length, inWork: clips.length - published.length, total, byPlatform, avg: published.length ? total / published.length : 0, best };
+}
