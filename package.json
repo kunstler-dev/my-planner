@@ -1,8 +1,8 @@
 {
   "name": "planner",
   "productName": "Planner",
-  "version": "1.0.0",
-  "description": "Чёрно-белый планер: доходы и расходы, аналитика Telegram-канала, Grok",
+  "version": "1.1.0",
+  "description": "Чёрно-белый планер: доходы и расходы, аналитика Telegram-каналов, статистика Dota 2 / Deadlock / CS2, Grok",
   "main": "src/main/main.js",
   "author": "kunstler-dev",
   "license": "MIT",

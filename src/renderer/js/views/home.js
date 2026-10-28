@@ -6,7 +6,8 @@ import { today, thisMonth, longToday, prettyDate, addDays } from '../dates.js';
 import { totals, inMonth } from '../finance-calc.js';
 import { postList, windowStats, subscriberDelta } from '../tg.js';
 import { entryModal, entryRow } from './finance.js';
-import { askGrokAboutChannel } from './channel.js';
+import { askGrokAboutChannel, activeChannel } from './channel.js';
+import { dotaRank, winrate, pct } from '../games-calc.js';
 import { go } from '../app.js';
 
 function greeting() {
@@ -107,12 +108,51 @@ function tasksCard() {
   );
 }
 
+function gamesCard() {
+  const g = state.data.games;
+  const open = (tab) => () => {
+    update((d) => (d.games.tab = tab), { silent: true });
+    go('games');
+  };
+  const col = (tab, title, value, note) =>
+    h(
+      'button',
+      { class: 'game-col', onclick: open(tab) },
+      h('div', { class: 'stat-label' }, title),
+      h('div', { class: 'game-value' }, value),
+      h('div', { class: 'stat-note' }, note),
+    );
+  const dota = g.dota?.data;
+  const dl = g.deadlock?.data;
+  const cs = g.cs?.data;
+  const games30 = dota ? dota.wl30.win + dota.wl30.lose : 0;
+  return h(
+    'div',
+    { style: { marginTop: '16px' } },
+    card(
+      'Игры',
+      h('button', { class: 'btn ghost sm', onclick: () => go('games') }, g.steamId ? 'Открыть' : 'Подключить Steam', icon('right', 14)),
+      g.steamId
+        ? h(
+            'div',
+            { class: 'grid cols-3', style: { gap: '12px' } },
+            col('dota', 'Dota 2', dota ? dotaRank(dota.rankTier, dota.leaderboard) : '—', dota ? (games30 ? `винрейт за 30 дней ${pct(winrate(dota.wl30.win, games30))}` : 'за 30 дней игр нет') : 'нет данных'),
+            col('deadlock', 'Deadlock', dl ? dl.rank : '—', dl ? `винрейт ${pct(winrate(dl.total.wins, dl.total.matches))} · ${dl.total.matches} матчей` : 'нет данных'),
+            col('cs', 'CS2', cs?.premier ? cs.premier.toLocaleString('ru-RU') : '—', cs ? `Premier · винрейт ${pct(cs.winrate)}` : 'нет данных'),
+          )
+        : empty('Подключи профиль Steam — здесь будут ранги и винрейт в Dota 2, Deadlock и CS2.'),
+    ),
+  );
+}
+
 export function homeView() {
   const m = totals(inMonth(state.data.finance, thisMonth()));
-  const ch = state.data.channel;
-  const posts = postList(ch);
-  const subs = ch.snapshots.at(-1)?.subscribers;
-  const d7 = subscriberDelta(ch.snapshots, 7, today());
+  const channels = state.data.channels;
+  const ch = activeChannel();
+  const posts = ch ? postList(ch) : [];
+  const subs = channels.reduce((s, c) => s + (c.snapshots.at(-1)?.subscribers || 0), 0);
+  const deltas = channels.map((c) => subscriberDelta(c.snapshots, 7, today())).filter(Boolean);
+  const d7 = deltas.length ? deltas.reduce((s, d) => s + d.delta, 0) : null;
   const w7 = windowStats(posts, 7);
   const recent = [...state.data.finance].sort((a, b) => b.date.localeCompare(a.date) || (b.id > a.id ? 1 : -1)).slice(0, 6);
 
@@ -135,8 +175,8 @@ export function homeView() {
       { class: 'grid cols-4', style: { marginBottom: '16px' } },
       tile('Доходы за месяц', 'up', money(m.income), null, () => go('finance')),
       tile('Расходы за месяц', 'down', money(m.expense), `итог ${money(m.net, { sign: true })}`, () => go('finance')),
-      tile('Подписчики', 'users', subs ? compact(subs) : '—', subs ? (d7 ? `${d7.delta >= 0 ? '+' : '−'}${compact(Math.abs(d7.delta))} за неделю` : `@${ch.username}`) : 'канал не подключён', () => go('channel')),
-      tile('Средний охват · 7 дней', 'eye', w7.avgViews ? compact(w7.avgViews) : '—', posts.length ? `${w7.count} постов за неделю` : null, () => go('channel')),
+      tile(channels.length > 1 ? `Подписчики · ${channels.length} канала` : 'Подписчики', 'users', subs ? compact(subs) : '—', subs ? (d7 != null ? `${d7 >= 0 ? '+' : '−'}${compact(Math.abs(d7))} за неделю` : channels.map((c) => `@${c.username}`).join(', ')) : 'канал не подключён', () => go('channel')),
+      tile('Средний охват · 7 дней', 'eye', w7.avgViews ? compact(w7.avgViews) : '—', ch ? `@${ch.username} · ${w7.count} постов за неделю` : null, () => go('channel')),
     ),
     h(
       'div',
@@ -148,8 +188,20 @@ export function homeView() {
         recent.length ? h('div', { class: 'list' }, recent.map((e) => entryRow(e, { showDate: true }))) : empty('Записей пока нет.'),
       ),
       card(
-        ch.username ? `@${ch.username}` : 'Telegram-канал',
-        h('button', { class: 'btn ghost sm', onclick: () => go('channel') }, 'Открыть', icon('right', 14)),
+        ch ? `@${ch.username}` : 'Telegram-канал',
+        h(
+          'div',
+          { class: 'row' },
+          channels.length > 1 &&
+            h(
+              'div',
+              { class: 'seg' },
+              channels.map((c, i) =>
+                h('button', { class: c === ch ? 'on' : '', title: `@${c.username}`, onclick: () => update((d) => (d.settings.activeChannel = c.username)) }, String(i + 1)),
+              ),
+            ),
+          h('button', { class: 'btn ghost sm', onclick: () => go('channel') }, 'Открыть', icon('right', 14)),
+        ),
         posts.length > 1
           ? h(
               'div',
@@ -169,5 +221,6 @@ export function homeView() {
           : h('div', {}, empty('Подключи канал, чтобы видеть подписчиков и охваты.'), h('button', { class: 'btn', onclick: () => go('channel') }, 'Подключить')),
       ),
     ),
+    gamesCard(),
   );
 }

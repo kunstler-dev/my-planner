@@ -10,6 +10,15 @@ import { go } from '../app.js';
 
 const STALE_MS = 3 * 3600 * 1000;
 let loading = false;
+let adding = false;
+
+const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
+
+/** The channel shown now (settings.activeChannel), or the first one. */
+export function activeChannel() {
+  const list = state.data.channels;
+  return list.find((c) => sameName(c.username, state.data.settings.activeChannel)) || list[0] || null;
+}
 
 const ERRORS = {
   bad_name: 'Неверное имя канала',
@@ -27,8 +36,9 @@ export async function refreshChannel(username, { silent = false } = {}) {
     if (!first.ok) throw new Error(ERRORS[first.error] || first.message || first.error);
     const page = parseChannelPage(first.html);
     if (!page.title) throw new Error(ERRORS.not_public);
-    const switching = state.data.channel.username.toLowerCase() !== (page.username || name).toLowerCase();
-    const posts = switching ? {} : { ...state.data.channel.posts };
+    const username = page.username || name;
+    const existing = state.data.channels.find((c) => sameName(c.username, username));
+    const posts = { ...existing?.posts };
     const now = Date.now();
     let added = mergePosts(posts, page.posts, now);
     // Older pages: deep on the first load, a little on later refreshes (to update recent views).
@@ -43,15 +53,19 @@ export async function refreshChannel(username, { silent = false } = {}) {
       before = Math.min(...older.map((p) => p.id));
     }
     update((d) => {
-      d.settings.channel = page.username || name;
-      d.channel = {
+      const i = d.channels.findIndex((c) => sameName(c.username, username));
+      const rec = {
         title: page.title,
-        username: page.username || name,
-        snapshots: addSnapshot(switching ? [] : d.channel.snapshots, today(), page.subscribers),
+        username,
+        snapshots: addSnapshot(i >= 0 ? d.channels[i].snapshots : [], today(), page.subscribers),
         posts,
         fetchedAt: now,
       };
+      if (i >= 0) d.channels[i] = rec;
+      else d.channels.push(rec);
+      if (!silent) d.settings.activeChannel = username;
     });
+    adding = false;
     if (!silent) toast(added ? `Обновлено, новых постов: ${added}` : 'Данные обновлены');
   } catch (err) {
     toast(err.message);
@@ -64,9 +78,10 @@ export async function refreshChannel(username, { silent = false } = {}) {
 function connectCard() {
   const input = h('input', { class: 'input', placeholder: '@username или ссылка t.me/…', style: { flex: 1 } });
   const submit = () => input.value.trim() && refreshChannel(input.value.trim());
+  setTimeout(() => input.focus(), 0);
   return card(
-    'Подключить канал',
-    null,
+    state.data.channels.length ? 'Добавить канал' : 'Подключить канал',
+    state.data.channels.length && h('button', { class: 'btn ghost sm', onclick: () => ((adding = false), rerender()) }, 'Отмена'),
     h(
       'p',
       { class: 'muted', style: { marginTop: 0 } },
@@ -97,14 +112,17 @@ function snapshotModal() {
       onSubmit: () => {
         const n = parseInt(subs.value, 10);
         if (!n) return false;
-        update((d) => (d.channel.snapshots = addSnapshot(d.channel.snapshots, date.value, n)));
+        update((d) => {
+          const c = d.channels.find((x) => sameName(x.username, activeChannel().username));
+          c.snapshots = addSnapshot(c.snapshots, date.value, n);
+        });
       },
     },
   );
 }
 
 const pct = (v) => `${(v * 100).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%`;
-const postUrl = (p) => `https://t.me/${state.data.channel.username}/${p.id}`;
+const postUrl = (p) => `https://t.me/${activeChannel().username}/${p.id}`;
 const when = (p) => new Date(p.date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function postRow(p, subs) {
@@ -171,7 +189,7 @@ function heatmap(t) {
 }
 
 export function askGrokAboutChannel() {
-  const summary = summaryForAI(state.data.channel, today());
+  const summary = summaryForAI(activeChannel(), today());
   go('grok', {
     prompt:
       'Проанализируй мой Telegram-канал по этим данным. Что работает лучше всего, что проседает, когда лучше публиковать, ' +
@@ -180,10 +198,37 @@ export function askGrokAboutChannel() {
   });
 }
 
+function channelSwitcher(ch) {
+  const list = state.data.channels;
+  return h(
+    'div',
+    { class: 'row', style: { marginBottom: '18px', flexWrap: 'wrap' } },
+    list.length > 1 &&
+      h(
+        'div',
+        { class: 'seg' },
+        list.map((c) =>
+          h(
+            'button',
+            { class: c === ch && !adding ? 'on' : '', onclick: () => ((adding = false), update((d) => (d.settings.activeChannel = c.username)), undefined) },
+            `@${c.username}`,
+          ),
+        ),
+      ),
+    !adding && h('button', { class: 'btn sm', onclick: () => ((adding = true), rerender()) }, icon('plus', 15), 'Канал'),
+  );
+}
+
 export function channelView() {
-  const ch = state.data.channel;
-  if (!ch.username) {
-    return h('div', { class: 'page' }, h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Telegram-канал'), h('div', { class: 'sub' }, 'Аналитика публичного канала'))), connectCard());
+  const ch = activeChannel();
+  if (!ch || adding) {
+    return h(
+      'div',
+      { class: 'page' },
+      h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Telegram-каналы'), h('div', { class: 'sub' }, 'Аналитика публичных каналов'))),
+      ch && channelSwitcher(ch),
+      connectCard(),
+    );
   }
   if (!loading && Date.now() - ch.fetchedAt > STALE_MS) setTimeout(() => refreshChannel(ch.username, { silent: true }), 0);
 
@@ -222,20 +267,21 @@ export function channelView() {
           {
             class: 'btn ghost',
             onclick: () => {
-              if (confirm('Отключить канал? Сохранённая статистика будет удалена.')) {
+              if (confirm(`Удалить @${ch.username} из планера? Сохранённая статистика канала будет удалена.`)) {
                 update((d) => {
-                  d.settings.channel = '';
-                  d.channel = { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 };
+                  d.channels = d.channels.filter((c) => !sameName(c.username, ch.username));
+                  d.settings.activeChannel = d.channels[0]?.username || '';
                 });
               }
             },
           },
-          'Сменить канал',
+          'Удалить канал',
         ),
         h('button', { class: 'btn', disabled: loading, onclick: () => refreshChannel(ch.username) }, icon('refresh', 16), loading ? 'Обновляю…' : 'Обновить'),
         h('button', { class: 'btn primary', disabled: !posts.length, onclick: askGrokAboutChannel }, icon('spark', 16), 'Разбор от Grok'),
       ),
     ),
+    channelSwitcher(ch),
     h(
       'div',
       { class: 'grid cols-4', style: { marginBottom: '16px' } },

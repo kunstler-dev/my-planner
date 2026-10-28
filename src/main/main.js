@@ -16,6 +16,7 @@ let win;
 let store;
 let secrets;
 const chats = new Map();
+const NET_HOSTS = ['api.opendota.com', 'api.deadlock-api.com', 'api-public.cs-prod.leetify.com', 'steamcommunity.com'];
 
 function createWindow() {
   const data = store.load();
@@ -74,6 +75,23 @@ app.whenReady().then(() => {
     // BOM so Excel opens Cyrillic CSV correctly.
     fs.writeFileSync(filePath, '﻿' + content, 'utf8');
     return true;
+  });
+
+  // GET to the game stats APIs and Steam profile XML only; the page itself may not open connections (CSP).
+  ipcMain.handle('net:get', async (_e, url) => {
+    let host;
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      return { ok: false, status: 0, error: 'bad_url' };
+    }
+    if (!NET_HOSTS.includes(host)) return { ok: false, status: 0, error: 'host_not_allowed' };
+    try {
+      const res = await fetch(url, { headers: { 'User-Agent': 'Planner/1.0 (desktop app)', Accept: 'application/json, text/xml' } });
+      return { ok: res.ok, status: res.status, text: await res.text() };
+    } catch (err) {
+      return { ok: false, status: 0, error: 'network', message: err.message };
+    }
   });
 
   // Public channel preview page t.me/s/<name>; parsed in the renderer.

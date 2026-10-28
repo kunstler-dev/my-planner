@@ -6,16 +6,18 @@ import { homeView } from './views/home.js';
 import { financeView } from './views/finance.js';
 import { channelView } from './views/channel.js';
 import { grokView } from './views/grok.js';
+import { gamesView } from './views/games.js';
 import { settingsView } from './views/settings.js';
 
 const VIEWS = {
   home: { title: 'Главная', icon: 'home', render: homeView },
   finance: { title: 'Финансы', icon: 'wallet', render: financeView },
-  channel: { title: 'Telegram-канал', icon: 'send', render: channelView },
+  channel: { title: 'Telegram-каналы', icon: 'send', render: channelView },
+  games: { title: 'Игры', icon: 'gamepad', render: gamesView },
   grok: { title: 'Grok', icon: 'spark', render: grokView },
   settings: { title: 'Настройки', icon: 'gear', render: settingsView },
 };
-const NAV = [['home'], ['Учёт', 'finance', 'channel'], ['Помощник', 'grok']];
+const NAV = [['home'], ['Учёт', 'finance', 'channel', 'games'], ['Помощник', 'grok']];
 
 export function go(view, opts) {
   state.view = view;

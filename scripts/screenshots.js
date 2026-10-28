@@ -1,12 +1,13 @@
 // Dev check: starts the app on a temp data folder with demo data, opens every section in light and dark
-// theme and saves screenshots. Usage: npx electron scripts/screenshots.js <outDir> [channel]
+// theme and saves screenshots. Usage: npx electron scripts/screenshots.js <outDir> [ch1,ch2] [steam profile]
 const { app, BrowserWindow } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
 const out = path.resolve(process.argv[2] || 'shots');
-const channel = process.argv[3] || 'durov';
+const channels = (process.argv[3] || 'durov,telegram').split(',');
+const steam = process.argv[4] || 'https://steamcommunity.com/profiles/76561198034202275';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'planner-shots-'));
 process.env.PLANNER_DATA_DIR = dataDir;
 
@@ -49,29 +50,57 @@ fs.mkdirSync(out, { recursive: true });
 require('../src/main/main.js');
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const log = (...a) => fs.appendFileSync(path.join(out, 'progress.txt'), `${a.join(' ')}\n`);
 
 app.on('browser-window-created', (_e, win) => {
   win.webContents.once('did-finish-load', async () => {
-    const js = (code) => win.webContents.executeJavaScript(code);
+    const js = (code) => win.webContents.executeJavaScript(`(() => { try { return (${code}); } catch (e) { return 'ERR ' + e.message; } })()`);
+    // Waits until the expression is truthy (max `ms`).
+    const until = async (expr, ms = 20000) => {
+      for (let t = 0; t < ms; t += 250) {
+        if (await js(expr)) return true;
+        await wait(250);
+      }
+      log('timeout waiting for', expr);
+      return false;
+    };
     const click = (text) => js(`[...document.querySelectorAll('.nav-item')].find(b => b.textContent.trim() === ${JSON.stringify(text)})?.click()`);
     const shot = async (name) => {
+      log('shot', name);
       await wait(900);
       fs.writeFileSync(path.join(out, `${name}.png`), (await win.webContents.capturePage()).toPNG());
     };
     const errors = [];
-    win.webContents.on('console-message', (_ev, level, message) => level >= 2 && errors.push(message));
+    win.webContents.on('console-message', (e) => e.level !== 'info' && e.level !== 'debug' && (errors.push(e.message), log('[page]', e.level, e.message)));
     try {
       await wait(1500);
       await js(`window.api.grok.setKey('xai-demo-key')`);
-      await click('Telegram-канал');
+      const submitInput = (value) => js(`(() => { const i = document.querySelector('main form input'); i.value = ${JSON.stringify(value)}; i.form.requestSubmit(); })()`);
+      await click('Telegram-каналы');
+      for (const [i, ch] of channels.entries()) {
+        if (i) await js(`[...document.querySelectorAll('main .btn')].find(b => b.textContent.trim() === 'Канал').click()`);
+        await until(`!!document.querySelector('main form input')`);
+        await submitInput(ch);
+        await until(`document.querySelectorAll('main .stat-value').length > 0 && !document.querySelector('main form input')`, 30000);
+        log('channel added', ch);
+      }
+      await click('Игры');
       await wait(300);
-      await js(`(() => { const i = document.querySelector('main input'); i.value = ${JSON.stringify(channel)}; i.form.requestSubmit(); })()`);
-      await wait(9000);
+      await until(`!!document.querySelector('main form input')`);
+      await submitInput(steam);
+      await until(`document.querySelectorAll('main .stat-value').length > 0`, 30000);
+      log('steam linked');
       for (const theme of ['light', 'dark']) {
         if (theme === 'dark') await click('Тёмная тема');
-        for (const [view, name] of [['Главная', 'home'], ['Финансы', 'finance'], ['Telegram-канал', 'channel'], ['Grok', 'grok'], ['Настройки', 'settings']]) {
+        for (const [view, name] of [['Главная', 'home'], ['Финансы', 'finance'], ['Telegram-каналы', 'channel'], ['Grok', 'grok'], ['Настройки', 'settings']]) {
           await click(view);
           await shot(`${name}-${theme}`);
+        }
+        await click('Игры');
+        for (const tab of ['Dota 2', 'Deadlock', 'CS2']) {
+          await js(`[...document.querySelectorAll('main .seg button')].find(b => b.textContent === ${JSON.stringify(tab)}).click()`);
+          await until(`!document.querySelector('main').textContent.includes('Загружаю статистику')`, 30000);
+          await shot(`games-${tab.replace(' ', '').toLowerCase()}-${theme}`);
         }
       }
       await click('Финансы');

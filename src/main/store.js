@@ -2,26 +2,42 @@
 const fs = require('fs');
 const path = require('path');
 
+const CURRENCIES = ['€', '₴'];
+
 function defaultData() {
   return {
-    version: 1,
-    settings: { theme: 'light', currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' },
+    version: 2,
+    settings: { theme: 'light', currency: '€', pets: true, petsColor: false, grokModel: 'grok-4', activeChannel: '' },
     finance: [],
     tasks: [],
-    channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 },
+    channels: [],
+    games: { steamId: '', accountId: 0, persona: '', avatar: '', tab: 'dota', dota: null, deadlock: null, cs: null },
     chat: [],
   };
+}
+
+function normalizeChannel(c) {
+  return { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0, ...c };
 }
 
 function normalize(raw) {
   const d = defaultData();
   if (!raw || typeof raw !== 'object') return d;
+  const settings = { ...d.settings, ...(raw.settings || {}) };
+  if (!CURRENCIES.includes(settings.currency)) settings.currency = '€';
+  // v1 kept a single channel in `channel`.
+  let channels = Array.isArray(raw.channels) ? raw.channels : [];
+  if (!channels.length && raw.channel?.username) channels = [raw.channel];
+  channels = channels.map(normalizeChannel);
+  if (!channels.some((c) => c.username === settings.activeChannel)) settings.activeChannel = channels[0]?.username || '';
+  delete settings.channel;
   return {
-    version: 1,
-    settings: { ...d.settings, ...(raw.settings || {}) },
+    version: 2,
+    settings,
     finance: Array.isArray(raw.finance) ? raw.finance : [],
     tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
-    channel: { ...d.channel, ...(raw.channel || {}) },
+    channels,
+    games: { ...d.games, ...(raw.games || {}) },
     chat: Array.isArray(raw.chat) ? raw.chat : [],
   };
 }

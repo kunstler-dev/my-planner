@@ -133,7 +133,10 @@ export function settingsView() {
             'Валюта',
             'Символ в суммах',
             seg(
-              ['₽', '$', '€', '₸', '₴'].map((c) => [c, c]),
+              [
+                ['€', 'Евро €'],
+                ['₴', 'Гривна ₴'],
+              ],
               s.currency,
               (v) => update((d) => (d.settings.currency = v)),
             ),
