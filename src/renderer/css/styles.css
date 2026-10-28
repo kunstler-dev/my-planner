@@ -1101,3 +1101,9 @@ textarea.input {
   width: 180px;
   accent-color: var(--ink);
 }
+.quick-rank {
+  margin-bottom: 14px;
+}
+.quick-rank .input {
+  height: 36px;
+}

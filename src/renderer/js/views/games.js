@@ -266,6 +266,51 @@ function rankGoalModal(key) {
   );
 }
 
+/** Saves today's value (replacing an entry from today, keeping its note). */
+function saveToday(key, value) {
+  update((d) => {
+    const list = d.ranks[key].entries;
+    const i = list.findIndex((e) => e.date === today());
+    if (i >= 0) list[i] = { ...list[i], value };
+    else list.push({ id: uid(), date: today(), value, note: '' });
+    list.sort((a, b) => a.date.localeCompare(b.date));
+  });
+  toast('Записано');
+}
+
+/** Inline «current value» form at the top of each rank card. */
+function quickEntry(key) {
+  const t = TRACKS[key];
+  const last = state.data.ranks[key].entries.at(-1)?.value;
+  if (key === 'deadlock') {
+    const cur = last ?? 0;
+    const tier = h('select', { class: 'input' }, DEADLOCK_TIERS.map((name, i) => h('option', { value: i, selected: i === Math.floor(cur / 6) ? 'selected' : null }, name)));
+    const sub = h('select', { class: 'input', style: { width: '64px' } }, [1, 2, 3, 4, 5, 6].map((n) => h('option', { value: n, selected: n === (cur % 6) + 1 ? 'selected' : null }, String(n))));
+    return h(
+      'form',
+      { class: 'row quick-rank', onsubmit: (e) => (e.preventDefault(), saveToday(key, deadlockValue(Number(tier.value), Number(sub.value)))) },
+      tier,
+      sub,
+      h('button', { class: 'btn primary', type: 'submit' }, 'Сохранить'),
+    );
+  }
+  const input = h('input', { class: 'input', type: 'number', min: 0, step: 1, placeholder: `Текущий ${t.unit}`, style: { flex: 1 } });
+  return h(
+    'form',
+    {
+      class: 'row quick-rank',
+      onsubmit: (e) => {
+        e.preventDefault();
+        const v = Number(String(input.value).replace(',', '.'));
+        if (!input.value || !(v >= 0)) return input.focus();
+        saveToday(key, v);
+      },
+    },
+    input,
+    h('button', { class: 'btn primary', type: 'submit' }, 'Сохранить'),
+  );
+}
+
 function rankCard(key) {
   const t = TRACKS[key];
   const { goal, entries } = state.data.ranks[key];
@@ -274,9 +319,16 @@ function rankCard(key) {
   const delta = (v) => (key === 'deadlock' ? `${v > 0 ? '+' : ''}${v} подр.` : `${v > 0 ? '+' : ''}${Math.round(v)} ${t.unit}`);
   return card(
     t.title,
-    h('div', { class: 'row' }, h('button', { class: 'btn ghost sm', onclick: () => rankGoalModal(key) }, 'Цель'), h('button', { class: 'btn primary sm', onclick: () => rankEntryModal(key) }, icon('plus', 14), 'Записать')),
+    h(
+      'div',
+      { class: 'row' },
+      h('button', { class: 'btn ghost sm', title: 'Цель', onclick: () => rankGoalModal(key) }, goal != null ? `Цель: ${t.fmt(goal)}` : 'Поставить цель'),
+      h('button', { class: 'btn ghost sm icon-only', title: 'Запись с датой и заметкой', onclick: () => rankEntryModal(key) }, icon('edit', 14)),
+    ),
+    h('div', { class: 'meta', style: { marginBottom: '6px' } }, key === 'deadlock' ? 'Текущий ранг' : `Текущий ${t.unit}`),
+    quickEntry(key),
     p.current == null
-      ? empty(key === 'deadlock' ? 'Запиши свой ранг — можно поставить цель Eternus.' : `Запиши текущий ${t.unit} — после каждой сессии или раз в неделю.`)
+      ? empty(goal != null ? `Цель: ${t.fmt(goal)}. Впиши текущий ${key === 'deadlock' ? 'ранг' : t.unit} выше — появится прогресс.` : 'Впиши текущее значение выше — после каждой сессии или раз в неделю.')
       : [
           h('div', { class: 'stat-value' }, t.fmt(p.current)),
           h('div', { class: 'muted' }, t.sub(p.current)),
