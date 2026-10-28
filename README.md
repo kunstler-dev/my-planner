@@ -15,11 +15,16 @@ All data stays on the local machine; there is no sync.
 | **Grok**             | Streaming chat with the xAI API using your own key (encrypted with Windows DPAPI). Quick prompts send your finance and channel numbers along: finance review, channel review, post ideas, weekly plan. Model is selectable.                          |
 | **Settings**         | xAI key and model (list loaded from the API), light/dark theme, pets on/off and black-and-white or coloured, currency symbol, data folder.                                                                                                           |
 
-## Run
+## Download
+
+Grab `Planner-<version>-portable.exe` from the [latest release](https://github.com/kunstler-dev/my-planner/releases/latest). It is portable: no installation, just run it. The build is not code-signed, so Windows SmartScreen asks once (_More info → Run anyway_).
+
+## Run from source
 
 ```bash
 npm install
 npm start            # npm run dev opens DevTools
+npx electron scripts/make-icons.js   # build/icon.svg → icon.png + icon.ico
 npm test             # unit tests: finance math, channel page parser, Grok streaming
 npm run dist:win     # portable .exe → dist/Planner-<version>-portable.exe
 npx electron scripts/screenshots.js shots durov   # demo data + screenshots of every screen

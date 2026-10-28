@@ -86,6 +86,12 @@ h3 {
   font-size: 15px;
   padding: 0 8px 18px;
 }
+.brand-icon {
+  display: block;
+}
+:root[data-theme='dark'] .brand-icon {
+  filter: invert(1);
+}
 .brand-mark {
   display: grid;
   place-items: center;
