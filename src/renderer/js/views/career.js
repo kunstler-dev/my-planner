@@ -1,7 +1,7 @@
-// Career: Ausbildung / job applications board, weekly goal, follow-up reminders, Bewerbung documents checklist and
-// Grok helpers for Anschreiben and interview prep.
+// Career: Ausbildung / job applications as a compact list (inline status, quick add, filters), weekly goal,
+// follow-up reminders, Bewerbung documents and Grok helpers for the Anschreiben, follow-ups and interview prep.
 import { state, update } from '../state.js';
-import { h, icon, uid, card, empty, toast } from '../ui.js';
+import { h, icon, uid, card, empty } from '../ui.js';
 import { formModal } from '../modal.js';
 import { today, prettyDate, addDays } from '../dates.js';
 import { APP_STATUSES, careerStats } from '../planner-calc.js';
@@ -67,12 +67,10 @@ function appModal(a) {
   );
 }
 
-function move(a, dir) {
-  const idx = APP_STATUSES.findIndex(([k]) => k === a.status);
-  const next = APP_STATUSES[Math.min(APP_STATUSES.length - 1, Math.max(0, idx + dir))][0];
+function setStatus(a, status) {
   update((d) => {
     const i = d.career.applications.findIndex((x) => x.id === a.id);
-    d.career.applications[i] = withStatus(d.career.applications[i], next);
+    d.career.applications[i] = withStatus(d.career.applications[i], status);
   });
 }
 
@@ -93,42 +91,8 @@ function interviewPrompt(a) {
   );
 }
 
-function appCard(a) {
-  const td = today();
-  const due = a.followUp && a.followUp <= td && (a.status === 'sent' || a.status === 'interview');
-  const idx = APP_STATUSES.findIndex(([k]) => k === a.status);
-  return h(
-    'div',
-    { class: `kanban-card${due ? ' due' : ''}` },
-    h(
-      'div',
-      { style: { cursor: 'pointer' }, onclick: () => appModal(a) },
-      h('div', { class: 'title', style: { fontWeight: 600 } }, a.company),
-      h('div', { class: 'meta' }, a.position),
-      h('div', { class: 'row', style: { gap: '6px', marginTop: '6px', flexWrap: 'wrap' } }, h('span', { class: 'badge' }, kindLabel(a.kind)), a.city && h('span', { class: 'badge' }, a.city)),
-      (a.sentAt || a.followUp) &&
-        h('div', { class: 'meta', style: { marginTop: '6px' } }, [a.sentAt && a.status !== 'wish' && `отправлено ${prettyDate(a.sentAt)}`, due && '⏰ пора написать ещё раз'].filter(Boolean).join(' · ')),
-    ),
-    h(
-      'div',
-      { class: 'row', style: { gap: '2px', marginTop: '8px' } },
-      idx > 0 && h('button', { class: 'btn ghost sm icon-only', title: 'Назад по статусу', onclick: () => move(a, -1) }, icon('left', 14)),
-      h('div', { class: 'spacer' }),
-      (a.status === 'wish' || a.status === 'sent') && h('button', { class: 'btn ghost sm', title: 'Написать Anschreiben с Grok', onclick: () => go('grok', { prompt: anschreibenPrompt(a) }) }, icon('spark', 13), 'Anschreiben'),
-      a.status === 'interview' && h('button', { class: 'btn ghost sm', title: 'Подготовка к собеседованию с Grok', onclick: () => go('grok', { prompt: interviewPrompt(a) }) }, icon('spark', 13), 'Подготовка'),
-      idx < APP_STATUSES.length - 2 && h('button', { class: 'btn ghost sm icon-only', title: 'Дальше по статусу', onclick: () => move(a, 1) }, icon('right', 14)),
-    ),
-  );
-}
-
-function tile(label, value, note, dark) {
-  return h(
-    'div',
-    { class: `card stat${dark ? ' dark' : ''}` },
-    h('div', { class: 'stat-label' }, label),
-    h('div', { class: 'stat-value' }, value),
-    note && h('div', { class: 'stat-note' }, note),
-  );
+function followUpPrompt(a) {
+  return `Напиши короткое вежливое письмо на немецком в ${a.company}: я отправил заявку на «${a.position}» ${a.sentAt ? prettyDate(a.sentAt) : 'недавно'} и хочу узнать о статусе. Без навязчивости, 4–5 предложений.`;
 }
 
 function goalModal() {
@@ -140,107 +104,180 @@ function goalModal() {
   });
 }
 
+// ---- compact list ----
+
+let filter = 'active';
+let docsOpen = false;
+const isDue = (a) => a.followUp && a.followUp <= today() && (a.status === 'sent' || a.status === 'interview');
+const ORDER = { interview: 0, offer: 1, sent: 2, wish: 3, rejected: 4 };
+
+/** Follow-ups that are due first, then by status, then the newest. */
+function sortApps(list) {
+  return [...list].sort(
+    (a, b) =>
+      Number(isDue(b)) - Number(isDue(a)) ||
+      ORDER[a.status] - ORDER[b.status] ||
+      (b.sentAt || b.createdAt || '').localeCompare(a.sentAt || a.createdAt || ''),
+  );
+}
+
+function quickAdd() {
+  const company = h('input', { class: 'input', placeholder: 'Компания', required: true, style: { flex: 1.2 } });
+  const position = h('input', { class: 'input', placeholder: 'Профессия / должность', required: true, style: { flex: 2 } });
+  const kind = h('select', { class: 'input', style: { width: '140px' } }, KINDS.map(([v, l]) => h('option', { value: v }, l)));
+  const sent = h('select', { class: 'input', style: { width: '150px' } }, h('option', { value: 'wish' }, 'Хочу отправить'), h('option', { value: 'sent' }, 'Уже отправил'));
+  return h(
+    'form',
+    {
+      class: 'row quick-app',
+      onsubmit: (e) => {
+        e.preventDefault();
+        if (!company.value.trim() || !position.value.trim()) return;
+        update((d) =>
+          d.career.applications.push(
+            withStatus({ id: uid(), createdAt: today(), company: company.value.trim(), position: position.value.trim(), kind: kind.value, city: '', link: '', note: '' }, sent.value),
+          ),
+        );
+        setTimeout(() => document.querySelector('.quick-app input')?.focus(), 0);
+      },
+    },
+    company,
+    position,
+    kind,
+    sent,
+    h('button', { class: 'btn primary icon-only', type: 'submit', title: 'Добавить (подробности — кликом по строке)' }, icon('plus', 16)),
+  );
+}
+
+function appRow(a) {
+  const due = isDue(a);
+  const meta = [
+    kindLabel(a.kind),
+    a.city,
+    a.status !== 'wish' && a.sentAt && `отпр. ${prettyDate(a.sentAt)}`,
+    a.start && `старт ${a.start}`,
+  ].filter(Boolean);
+  const grok =
+    a.status === 'interview'
+      ? h('button', { class: 'btn ghost sm', title: 'Подготовка к собеседованию с Grok', onclick: () => go('grok', { prompt: interviewPrompt(a) }) }, icon('spark', 13), 'Подготовка')
+      : due
+        ? h('button', { class: 'btn ghost sm', title: 'Письмо о статусе заявки', onclick: () => go('grok', { prompt: followUpPrompt(a) }) }, icon('spark', 13), 'Письмо')
+        : a.status === 'wish' || a.status === 'sent'
+          ? h('button', { class: 'btn ghost sm', title: 'Anschreiben с Grok', onclick: () => go('grok', { prompt: anschreibenPrompt(a) }) }, icon('spark', 13), 'Anschreiben')
+          : null;
+  return h(
+    'div',
+    { class: `app-row status-${a.status}${due ? ' due' : ''}` },
+    h(
+      'select',
+      { class: 'status-select', title: 'Статус', onchange: (e) => setStatus(a, e.target.value) },
+      APP_STATUSES.map(([k, l]) => h('option', { value: k, selected: k === a.status ? 'selected' : null }, l)),
+    ),
+    h(
+      'div',
+      { class: 'grow', style: { cursor: 'pointer', minWidth: 0 }, onclick: () => appModal(a) },
+      h('div', { class: 'title' }, h('b', {}, a.company), ' — ', a.position),
+      h('div', { class: 'meta' }, due ? ['⏰ пора написать ещё раз', ...meta].join(' · ') : meta.join(' · ')),
+    ),
+    h('div', { class: 'app-actions' }, grok, a.link && h('a', { class: 'btn ghost sm icon-only', href: a.link, target: '_blank', title: 'Вакансия' }, icon('up', 14))),
+  );
+}
+
+function statsStrip(st, apps, weeklyGoal) {
+  const share = Math.min(1, st.week / weeklyGoal);
+  const item = (label, value) => h('div', { class: 'strip-item' }, h('div', { class: 'strip-value' }, value), h('div', { class: 'meta' }, label));
+  return h(
+    'div',
+    { class: 'card career-strip' },
+    h(
+      'button',
+      { class: 'strip-week', title: 'Изменить цель на неделю', onclick: goalModal },
+      h('div', { class: 'meta' }, 'Откликов на неделе'),
+      h('div', { class: 'strip-value' }, `${st.week} / ${weeklyGoal}`),
+      h('div', { class: 'bar-track' }, h('div', { class: 'bar-fill', style: { width: `${share * 100}%` } })),
+    ),
+    item('отправлено', String(st.sent)),
+    item('отвечают', st.sent ? `${Math.round(st.responseRate * 100)}%` : '—'),
+    item('собеседования', String(st.interviews)),
+    item('офферы', String(st.offers)),
+    item('в планах', String(apps.filter((a) => a.status === 'wish').length)),
+  );
+}
+
 export function careerView() {
   const { applications, docs, weeklyGoal } = state.data.career;
   const st = careerStats(applications, today());
+  const count = (k) => applications.filter((a) => a.status === k).length;
+  const FILTERS = [['active', 'Активные', applications.filter((a) => a.status !== 'rejected').length], ...APP_STATUSES.map(([k, l]) => [k, l, count(k)]), ['all', 'Все', applications.length]];
+  const shown = sortApps(filter === 'all' ? applications : filter === 'active' ? applications.filter((a) => a.status !== 'rejected') : applications.filter((a) => a.status === filter));
   const docsDone = docs.filter((x) => x.done).length;
+
   return h(
     'div',
-    { class: 'page page-wide' },
+    { class: 'page' },
+    h('div', { class: 'page-head', style: { marginBottom: '14px' } }, h('div', {}, h('h1', {}, 'Карьера'), h('div', { class: 'sub' }, 'Ausbildung и работа в Германии'))),
+    statsStrip(st, applications, weeklyGoal),
     h(
       'div',
-      { class: 'page-head' },
-      h('div', {}, h('h1', {}, 'Карьера'), h('div', { class: 'sub' }, 'Ausbildung и работа в Германии: отклики, ответы, документы')),
-      h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: () => appModal(null) }, icon('plus', 16), 'Отклик')),
-    ),
-    h(
-      'div',
-      { class: 'grid cols-4', style: { marginBottom: '16px' } },
-      h(
-        'button',
-        { class: 'card stat dark', style: { textAlign: 'left', cursor: 'pointer' }, title: 'Изменить цель', onclick: goalModal },
-        h('div', { class: 'stat-label' }, 'Откликов на этой неделе'),
-        h('div', { class: 'stat-value' }, `${st.week} / ${weeklyGoal}`),
-        h('div', { class: 'bar-track invert', style: { marginTop: '6px' } }, h('div', { class: 'bar-fill', style: { width: `${Math.min(100, (st.week / weeklyGoal) * 100)}%` } })),
-      ),
-      tile('Всего отправлено', String(st.sent), `в работе: ${applications.filter((a) => a.status === 'wish').length} в планах`),
-      tile('Отвечают', st.sent ? `${Math.round(st.responseRate * 100)}%` : '—', 'приглашения и офферы / отправленные'),
-      tile('Собеседования · офферы', `${st.interviews} · ${st.offers}`, st.followUps.length ? `⏰ написать повторно: ${st.followUps.length}` : 'напоминаний нет'),
-    ),
-    h(
-      'div',
-      { class: 'kanban', style: { marginBottom: '16px' } },
-      APP_STATUSES.map(([k, label]) => {
-        const list = applications.filter((a) => a.status === k).sort((a, b) => (b.sentAt || b.createdAt || '').localeCompare(a.sentAt || a.createdAt || ''));
-        return h(
-          'div',
-          { class: 'kanban-col' },
-          h('div', { class: 'kanban-head' }, h('span', {}, label), h('span', { class: 'muted' }, String(list.length))),
-          list.map(appCard),
-          k === 'wish' && h('button', { class: 'btn ghost sm', style: { width: '100%' }, onclick: () => appModal(null) }, icon('plus', 14), 'Добавить'),
-        );
-      }),
-    ),
-    h(
-      'div',
-      { class: 'grid cols-3', style: { alignItems: 'start' } },
+      { class: 'career-layout' },
       card(
-        'Документы для Bewerbung',
-        h('span', { class: 'muted' }, `${docsDone} из ${docs.length}`),
+        null,
+        null,
+        quickAdd(),
         h(
           'div',
-          { class: 'list' },
-          docs.map((doc) =>
-            h(
-              'div',
-              { class: `list-row${doc.done ? ' task-done' : ''}` },
-              h(
-                'button',
-                { class: `check${doc.done ? ' on' : ''}`, onclick: () => update((d) => (d.career.docs.find((x) => x.id === doc.id).done = !doc.done)) },
-                doc.done && icon('check', 13),
-              ),
-              h('div', { class: 'grow title' }, doc.title),
-            ),
+          { class: 'filter-row' },
+          FILTERS.filter(([k, , n]) => n > 0 || k === 'active' || k === filter).map(([k, l, n]) =>
+            h('button', { class: `chip${filter === k ? ' on' : ''}`, onclick: () => ((filter = k), update(() => {})) }, `${l} ${n}`),
           ),
         ),
+        shown.length
+          ? h('div', { class: 'app-list' }, shown.map(appRow))
+          : empty(applications.length ? 'Здесь пусто' : 'Добавь первый отклик строкой выше: компания, профессия, тип. Подробности (город, ссылка, контакт) — кликом по строке.'),
       ),
-      card(
-        'Написать повторно',
-        null,
-        st.followUps.length
-          ? h(
+      h(
+        'div',
+        { class: 'stack' },
+        st.followUps.length > 0 &&
+          card(
+            `⏰ Написать повторно · ${st.followUps.length}`,
+            null,
+            h(
               'div',
               { class: 'list' },
               st.followUps.map((a) =>
                 h(
                   'div',
-                  { class: 'list-row', style: { cursor: 'pointer' }, onclick: () => appModal(a) },
-                  h('div', { class: 'grow' }, h('div', { class: 'title' }, a.company), h('div', { class: 'meta' }, `${a.position} · с ${prettyDate(a.followUp)}`)),
-                  h(
-                    'button',
-                    {
-                      class: 'btn ghost sm',
-                      onclick: (e) => {
-                        e.stopPropagation();
-                        go('grok', { prompt: `Напиши короткое вежливое письмо на немецком в ${a.company}: я отправил заявку на «${a.position}» ${prettyDate(a.sentAt)} и хочу узнать о статусе. Без навязчивости, 4–5 предложений.` });
-                      },
-                    },
-                    icon('spark', 13),
-                    'Письмо',
-                  ),
+                  { class: 'list-row' },
+                  h('div', { class: 'grow', style: { cursor: 'pointer' }, onclick: () => appModal(a) }, h('div', { class: 'title' }, a.company), h('div', { class: 'meta' }, `с ${prettyDate(a.followUp)}`)),
+                  h('button', { class: 'btn ghost sm', onclick: () => go('grok', { prompt: followUpPrompt(a) }) }, icon('spark', 13), 'Письмо'),
                 ),
               ),
-            )
-          : empty('Через неделю после отклика здесь появится напоминание написать в компанию.'),
-      ),
-      card(
-        'Где искать',
-        null,
-        h(
-          'div',
-          { class: 'list' },
-          LINKS.map(([name, url]) => h('a', { class: 'list-row', href: url, target: '_blank', style: { color: 'inherit', textDecoration: 'none' } }, h('div', { class: 'grow title' }, name), icon('up', 14))),
+            ),
+          ),
+        card(
+          'Документы',
+          h('button', { class: 'btn ghost sm', onclick: () => ((docsOpen = !docsOpen), update(() => {})) }, docsOpen ? 'Свернуть' : `${docsDone} из ${docs.length}`),
+          h('div', { class: 'bar-track' }, h('div', { class: 'bar-fill', style: { width: `${docs.length ? (docsDone / docs.length) * 100 : 0}%` } })),
+          (docsOpen || docsDone < docs.length) &&
+            h(
+              'div',
+              { class: 'list', style: { marginTop: '6px' } },
+              docs
+                .filter((doc) => docsOpen || !doc.done)
+                .slice(0, docsOpen ? docs.length : 3)
+                .map((doc) =>
+                  h(
+                    'div',
+                    { class: `list-row compact${doc.done ? ' task-done' : ''}` },
+                    h('button', { class: `check${doc.done ? ' on' : ''}`, onclick: () => update((d) => (d.career.docs.find((x) => x.id === doc.id).done = !doc.done)) }, doc.done && icon('check', 13)),
+                    h('div', { class: 'grow title' }, doc.title),
+                  ),
+                ),
+            ),
+          !docsOpen && docsDone < docs.length - 3 && h('button', { class: 'btn ghost sm', onclick: () => ((docsOpen = true), update(() => {})) }, `ещё ${docs.length - docsDone - 3}`),
         ),
+        card('Где искать', null, h('div', { class: 'chips' }, LINKS.map(([name, url]) => h('a', { class: 'chip', href: url, target: '_blank', style: { textDecoration: 'none', color: 'inherit' } }, name)))),
       ),
     ),
   );

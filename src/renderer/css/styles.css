@@ -1107,3 +1107,121 @@ textarea.input {
 .quick-rank .input {
   height: 36px;
 }
+
+/* ---- career: compact list ---- */
+.career-strip {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.strip-week {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 170px;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.strip-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.strip-item {
+  display: flex;
+  flex-direction: column;
+}
+.career-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .career-layout {
+    grid-template-columns: 1fr;
+  }
+}
+.quick-app {
+  margin-bottom: 12px;
+}
+.quick-app .input {
+  height: 36px;
+  min-width: 0;
+}
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.chip.on {
+  background: var(--ink);
+  color: var(--invert);
+  border-color: var(--ink);
+}
+.app-list {
+  display: flex;
+  flex-direction: column;
+}
+.app-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.app-row:last-child {
+  border-bottom: 0;
+}
+.app-row .title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-row.status-rejected {
+  opacity: 0.5;
+}
+.app-row.due .meta {
+  color: var(--ink);
+  font-weight: 600;
+}
+.status-select {
+  height: 28px;
+  width: 132px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  font-size: 12.5px;
+  padding: 0 6px;
+  cursor: pointer;
+}
+.app-row.status-interview .status-select,
+.app-row.status-offer .status-select {
+  background: var(--ink);
+  color: var(--invert);
+  border-color: var(--ink);
+}
+.app-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.list-row.compact {
+  padding: 6px 2px;
+}
+.app-row .grow {
+  flex: 1;
+}
+.app-row .meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
