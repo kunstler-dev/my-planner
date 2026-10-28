@@ -44,8 +44,6 @@ const AUTH_HOSTS = [
   /(^|\.)githubassets\.com$/,
   /(^|\.)githubusercontent\.com$/,
 ];
-// A plain Chrome user agent: some sign-in pages refuse anything that says "Electron".
-const CHROME_UA = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
 
 function hostMatches(url, list) {
   try {
@@ -133,7 +131,6 @@ app.whenReady().then(() => {
   const dir = app.getPath('userData');
   store = createStore(dir);
   secrets = createSecrets(dir);
-  session.fromPartition(GROK_PARTITION).setUserAgent(CHROME_UA);
 
   protocol.handle('planner-media', (req) => {
     const name = path.basename(decodeURIComponent(new URL(req.url).pathname));
