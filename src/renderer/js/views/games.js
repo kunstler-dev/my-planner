@@ -54,7 +54,7 @@ function linkCard() {
   };
   return card(
     'Подключить Steam',
-    state.data.games.steamId && h('button', { class: 'btn ghost sm', onclick: () => update((d) => (d.games.relink = false)) }, 'Отмена'),
+    !!state.data.games.steamId && h('button', { class: 'btn ghost sm', onclick: () => update((d) => (d.games.relink = false)) }, 'Отмена'),
     h(
       'p',
       { class: 'muted', style: { marginTop: 0 } },
@@ -138,7 +138,7 @@ function dotaTab(d) {
       { class: 'grid cols-2', style: { alignItems: 'start' } },
       card(
         'Последние матчи',
-        r20.length && wlStrip(r20.map((m) => m.win)),
+        r20.length > 0 && wlStrip(r20.map((m) => m.win)),
         r20.length ? h('div', { class: 'list' }, r20.map((m) => matchRow(m, (x) => `GPM ${x.gpm}`))) : empty('Матчей нет'),
       ),
       card('Герои за полгода', null, d.heroes.length ? heroBars(d.heroes) : empty('Нет данных')),
@@ -162,7 +162,7 @@ function deadlockTab(d) {
       { class: 'grid cols-2', style: { alignItems: 'start' } },
       card(
         'Последние матчи',
-        r20.length && wlStrip(r20.map((m) => m.win)),
+        r20.length > 0 && wlStrip(r20.map((m) => m.win)),
         r20.length ? h('div', { class: 'list' }, r20.map((m) => matchRow(m, (x) => `${compact(x.nw)} душ`))) : empty('Матчей нет'),
       ),
       card('Герои', null, d.heroes.length ? heroBars(d.heroes, (x) => `KDA ${x.kda.toFixed(1)}`) : empty('Нет данных')),
@@ -222,7 +222,7 @@ function csTab(d) {
       ),
       card(
         'Последние матчи',
-        r20.length && wlStrip(r20.map((m) => m.outcome === 'win')),
+        r20.length > 0 && wlStrip(r20.slice(0, 10).map((m) => m.outcome === 'win')),
         r20.length
           ? h(
               'div',
@@ -265,7 +265,7 @@ export function gamesView() {
       h(
         'div',
         { class: 'row', style: { gap: '14px' } },
-        g.avatar && g.steamId && !g.relink && h('img', { src: g.avatar, class: 'avatar', width: 48, height: 48, alt: '' }),
+        !!(g.avatar && g.steamId && !g.relink) && h('img', { src: g.avatar, class: 'avatar', width: 48, height: 48, alt: '' }),
         h('div', {}, h('h1', {}, 'Игры'), h('div', { class: 'sub' }, g.steamId && !g.relink ? g.persona : 'Dota 2 · Deadlock · CS2')),
       ),
       right,
@@ -301,7 +301,7 @@ export function gamesView() {
         { class: 'seg' },
         TABS.map(([k, label]) => h('button', { class: tab === k ? 'on' : '', onclick: () => update((d) => (d.games.tab = k)) }, label)),
       ),
-      slot?.fetchedAt && h('span', { class: 'muted', style: { fontSize: '12.5px' } }, `обновлено ${new Date(slot.fetchedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`),
+      !!slot?.fetchedAt && h('span', { class: 'muted', style: { fontSize: '12.5px' } }, `обновлено ${new Date(slot.fetchedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`),
     ),
     body,
   );

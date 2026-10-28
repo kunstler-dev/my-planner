@@ -796,6 +796,8 @@ textarea.input {
 
 .wl {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 4px;
 }
 .wl i {

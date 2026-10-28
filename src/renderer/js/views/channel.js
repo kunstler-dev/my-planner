@@ -36,8 +36,8 @@ export async function refreshChannel(username, { silent = false } = {}) {
     if (!first.ok) throw new Error(ERRORS[first.error] || first.message || first.error);
     const page = parseChannelPage(first.html);
     if (!page.title) throw new Error(ERRORS.not_public);
-    const username = page.username || name;
-    const existing = state.data.channels.find((c) => sameName(c.username, username));
+    const uname = page.username || name;
+    const existing = state.data.channels.find((c) => sameName(c.username, uname));
     const posts = { ...existing?.posts };
     const now = Date.now();
     let added = mergePosts(posts, page.posts, now);
@@ -53,17 +53,17 @@ export async function refreshChannel(username, { silent = false } = {}) {
       before = Math.min(...older.map((p) => p.id));
     }
     update((d) => {
-      const i = d.channels.findIndex((c) => sameName(c.username, username));
+      const i = d.channels.findIndex((c) => sameName(c.username, uname));
       const rec = {
         title: page.title,
-        username,
+        username: uname,
         snapshots: addSnapshot(i >= 0 ? d.channels[i].snapshots : [], today(), page.subscribers),
         posts,
         fetchedAt: now,
       };
       if (i >= 0) d.channels[i] = rec;
       else d.channels.push(rec);
-      if (!silent) d.settings.activeChannel = username;
+      if (!silent) d.settings.activeChannel = uname;
     });
     adding = false;
     if (!silent) toast(added ? `Обновлено, новых постов: ${added}` : 'Данные обновлены');
@@ -81,7 +81,7 @@ function connectCard() {
   setTimeout(() => input.focus(), 0);
   return card(
     state.data.channels.length ? 'Добавить канал' : 'Подключить канал',
-    state.data.channels.length && h('button', { class: 'btn ghost sm', onclick: () => ((adding = false), rerender()) }, 'Отмена'),
+    state.data.channels.length > 0 && h('button', { class: 'btn ghost sm', onclick: () => ((adding = false), rerender()) }, 'Отмена'),
     h(
       'p',
       { class: 'muted', style: { marginTop: 0 } },
@@ -287,7 +287,7 @@ export function channelView() {
       { class: 'grid cols-4', style: { marginBottom: '16px' } },
       tile('Подписчики', compact(subs), d7 ? fmtDelta(d7) : fmtDelta(d30), true),
       tile('Средний охват · 7 дней', w7.avgViews ? compact(w7.avgViews) : '—', `за 30 дней: ${w30.avgViews ? compact(w30.avgViews) : '—'}`),
-      tile('ERR · 30 дней', subs ? pct(w30.avgViews / subs) : '—', 'охват поста / подписчики'),
+      tile('ERR · 30 дней', subs && w30.avgViews ? pct(w30.avgViews / subs) : '—', 'охват поста / подписчики'),
       tile('Постов · 7 дней', String(w7.count), `за 30 дней: ${w30.count} · реакций в среднем ${compact(w30.avgReactions)}`),
     ),
     h(

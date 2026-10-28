@@ -53,7 +53,9 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => fs.appendFileSync(path.join(out, 'progress.txt'), `${a.join(' ')}\n`);
 
 app.on('browser-window-created', (_e, win) => {
+  log('window created');
   win.webContents.once('did-finish-load', async () => {
+    log('page loaded');
     const js = (code) => win.webContents.executeJavaScript(`(() => { try { return (${code}); } catch (e) { return 'ERR ' + e.message; } })()`);
     // Waits until the expression is truthy (max `ms`).
     const until = async (expr, ms = 20000) => {
@@ -61,7 +63,7 @@ app.on('browser-window-created', (_e, win) => {
         if (await js(expr)) return true;
         await wait(250);
       }
-      log('timeout waiting for', expr);
+      log('timeout waiting for', expr, '| main:', (await js("document.querySelector('main').innerText.slice(0, 300)")).replace(/s+/g, ' '), '| toast:', await js("document.getElementById('toast')?.textContent"));
       return false;
     };
     const click = (text) => js(`[...document.querySelectorAll('.nav-item')].find(b => b.textContent.trim() === ${JSON.stringify(text)})?.click()`);
@@ -74,6 +76,7 @@ app.on('browser-window-created', (_e, win) => {
     win.webContents.on('console-message', (e) => e.level !== 'info' && e.level !== 'debug' && (errors.push(e.message), log('[page]', e.level, e.message)));
     try {
       await wait(1500);
+      log('start');
       await js(`window.api.grok.setKey('xai-demo-key')`);
       const submitInput = (value) => js(`(() => { const i = document.querySelector('main form input'); i.value = ${JSON.stringify(value)}; i.form.requestSubmit(); })()`);
       await click('Telegram-каналы');
