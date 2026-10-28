@@ -1,0 +1,116 @@
+// DOM and formatting helpers.
+import { state } from './state.js';
+
+/** h('div', { class: 'x', onclick }, child, ...) — tiny element builder. */
+export function h(tag, attrs = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'value') el.value = v;
+    else if (k === 'checked') el.checked = !!v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of children.flat(Infinity)) {
+    if (c == null || c === false) continue;
+    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return el;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+export function svg(tag, attrs = {}, ...children) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) if (v != null) el.setAttribute(k, v);
+  for (const c of children.flat(Infinity)) if (c) el.append(c);
+  return el;
+}
+
+// Lucide-style line icons (24px grid, stroke = currentColor).
+const ICONS = {
+  home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',
+  wallet: 'M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3M21 8h-6a3 3 0 0 0 0 6h6z',
+  send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z',
+  spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8',
+  gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
+  plus: 'M12 5v14M5 12h14',
+  trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6',
+  edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z',
+  left: 'M15 18l-6-6 6-6',
+  right: 'M9 18l6-6-6-6',
+  up: 'M7 17 17 7M7 7h10v10',
+  down: 'M7 7l10 10M17 7v10H7',
+  refresh: 'M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5',
+  download: 'M12 3v12M7 10l5 5 5-5M5 21h14',
+  check: 'M20 6 9 17l-5-5',
+  moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
+  sun: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
+  eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  stop: 'M6 6h12v12H6z',
+  list: 'M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01',
+};
+export function icon(name, size = 18) {
+  return svg(
+    'svg',
+    {
+      width: size,
+      height: size,
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': 1.8,
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+      class: 'icon',
+    },
+    svg('path', { d: ICONS[name] || '' }),
+  );
+}
+
+export function money(n, { sign = false } = {}) {
+  const cur = state.data?.settings.currency || '₽';
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  const s = Math.abs(v).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  const pre = v < 0 ? '−' : sign && v > 0 ? '+' : '';
+  return `${pre}${s} ${cur}`;
+}
+
+/** 12 345 → «12,3 тыс.» for compact stats. */
+export function compact(n) {
+  const v = Number(n) || 0;
+  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} млн`;
+  if (Math.abs(v) >= 1e4) return `${(v / 1e3).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} тыс.`;
+  return Math.round(v).toLocaleString('ru-RU');
+}
+
+export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+let toastTimer;
+export function toast(text) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = h('div', { id: 'toast', class: 'toast' });
+    document.body.append(el);
+  }
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+export function card(title, actions, ...body) {
+  return h(
+    'section',
+    { class: 'card' },
+    title && h('header', { class: 'card-head' }, h('h2', {}, title), actions && h('div', { class: 'card-actions' }, actions)),
+    ...body,
+  );
+}
+
+export function empty(text) {
+  return h('p', { class: 'empty' }, text);
+}
