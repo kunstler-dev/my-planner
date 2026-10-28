@@ -23,6 +23,8 @@ const MEDIA_TYPES = {
 };
 const mediaDir = () => path.join(app.getPath('userData'), 'media');
 const STEAM = 'https://store.steampowered.com/api';
+// Ukrainian Steam store (prices in hryvnia), the user's account region.
+const STEAM_CC = 'ua';
 
 let win;
 let store;
@@ -165,12 +167,25 @@ app.whenReady().then(() => {
   /** Finds a stored media file left from before (e.g. copied in by hand) so settings can pick it up. */
   ipcMain.handle('media:list', () => (fs.existsSync(mediaDir()) ? fs.readdirSync(mediaDir()) : []));
 
-  // Steam store: search by name and current prices in euro (German store), no key needed.
+  // Steam store (Ukrainian region): search by name, one game with its name, and current prices; no key needed.
   ipcMain.handle('steam:search', async (_e, term) => {
     try {
-      const res = await fetch(`${STEAM}/storesearch/?term=${encodeURIComponent(String(term).slice(0, 80))}&l=russian&cc=DE`);
+      const res = await fetch(`${STEAM}/storesearch/?term=${encodeURIComponent(String(term).slice(0, 80))}&l=russian&cc=${STEAM_CC}`);
       if (!res.ok) return { ok: false, error: 'http' };
       return { ok: true, items: (await res.json()).items || [] };
+    } catch (err) {
+      return { ok: false, error: 'network', message: err.message };
+    }
+  });
+  ipcMain.handle('steam:app', async (_e, id) => {
+    const appId = Number(id);
+    if (!Number.isInteger(appId) || appId <= 0) return { ok: false, error: 'bad_id' };
+    try {
+      const res = await fetch(`${STEAM}/appdetails?appids=${appId}&cc=${STEAM_CC}&filters=basic,price_overview&l=russian`);
+      if (!res.ok) return { ok: false, error: 'http' };
+      const entry = (await res.json())[appId];
+      if (!entry?.success) return { ok: false, error: 'not_found' };
+      return { ok: true, name: entry.data.name, image: entry.data.capsule_image || entry.data.header_image || '', overview: entry.data.price_overview || null, free: !!entry.data.is_free };
     } catch (err) {
       return { ok: false, error: 'network', message: err.message };
     }
@@ -179,7 +194,7 @@ app.whenReady().then(() => {
     const list = (ids || []).map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 100);
     if (!list.length) return { ok: true, prices: {} };
     try {
-      const res = await fetch(`${STEAM}/appdetails?appids=${list.join(',')}&cc=de&filters=price_overview`);
+      const res = await fetch(`${STEAM}/appdetails?appids=${list.join(',')}&cc=${STEAM_CC}&filters=price_overview`);
       if (!res.ok) return { ok: false, error: 'http' };
       return { ok: true, prices: await res.json() };
     } catch (err) {

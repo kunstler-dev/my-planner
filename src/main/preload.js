@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('api', {
   steam: {
     search: (term) => ipcRenderer.invoke('steam:search', term),
     prices: (ids) => ipcRenderer.invoke('steam:prices', ids),
+    app: (id) => ipcRenderer.invoke('steam:app', id),
   },
   grokWeb: {
     logout: () => ipcRenderer.invoke('grokweb:logout'),

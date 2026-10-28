@@ -9,25 +9,33 @@ export function parseSteamAppId(input) {
   return m ? Number(m[1]) : null;
 }
 
+/** Steam currency code → symbol used in the app. */
+export const STEAM_CURRENCY = { UAH: '₴', EUR: '€', USD: '$' };
+
 /**
  * Applies Steam's price_overview (cents) to a wishlist item: current/initial price, discount, one history point per
- * day and the lowest price seen. A free or unreleased game (no overview) keeps price null.
+ * day and the lowest price seen. A free or unreleased game (no overview) keeps price null. When the currency changes
+ * (another store region), history and the target price start over.
  */
 export function applyPrice(item, overview, date) {
   if (!overview) return { ...item, price: null, initial: null, discount: 0, updatedAt: date };
   const price = overview.final / 100;
-  const history = (item.history || []).filter((h) => h.date !== date);
+  const currency = STEAM_CURRENCY[overview.currency] || overview.currency || '₴';
+  // A region switch changes the currency: older history would mix currencies, so it starts over.
+  const history = (item.currency && item.currency !== currency ? [] : item.history || []).filter((h) => h.date !== date);
   history.push({ date, price });
   history.sort((a, b) => a.date.localeCompare(b.date));
   const lowest = Math.min(price, ...history.map((h) => h.price));
-  return { ...item, price, initial: overview.initial / 100, discount: overview.discount_percent || 0, lowest, history: history.slice(-180), updatedAt: date };
+  const target = item.currency && item.currency !== currency ? null : item.target;
+  return { ...item, price, currency, target, initial: overview.initial / 100, discount: overview.discount_percent || 0, lowest, history: history.slice(-180), updatedAt: date };
 }
 
-export function wishlistSummary(items) {
+/** Totals; `toMain(amount, currency)` converts each game's price into one currency (identity by default). */
+export function wishlistSummary(items, toMain = (v) => v) {
   const priced = items.filter((i) => i.price != null);
   return {
-    total: priced.reduce((s, i) => s + i.price, 0),
-    saving: priced.reduce((s, i) => s + Math.max(0, (i.initial ?? i.price) - i.price), 0),
+    total: priced.reduce((s, i) => s + toMain(i.price, i.currency), 0),
+    saving: priced.reduce((s, i) => s + toMain(Math.max(0, (i.initial ?? i.price) - i.price), i.currency), 0),
     onSale: priced.filter((i) => i.discount > 0).length,
     atTarget: priced.filter((i) => i.target != null && i.target > 0 && i.price <= i.target).length,
   };

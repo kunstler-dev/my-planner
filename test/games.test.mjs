@@ -29,9 +29,13 @@ test('prices: history per day, lowest price, discounts and targets', () => {
   assert.equal(item.discount, 60);
   assert.equal(item.lowest, 15.99);
   assert.equal(item.history.length, 2);
+  assert.equal(item.currency, '₴'); // overview without a currency code
+  const ua = applyPrice({ ...item, currency: '€' }, { currency: 'UAH', initial: 22500, final: 22500, discount_percent: 0 }, '2026-10-11');
+  assert.deepEqual([ua.currency, ua.price, ua.history.length, ua.target], ['₴', 225, 1, null]);
   const free = applyPrice({ id: 2 }, null, '2026-10-10');
   assert.equal(free.price, null);
   const s = wishlistSummary([item, free, { price: 10, initial: 10, discount: 0, target: 5 }]);
+  assert.equal(wishlistSummary([{ price: 100, initial: 100, currency: '₴' }], (v, c) => (c === '₴' ? v / 50 : v)).total, 2);
   assert.equal(s.onSale, 1);
   assert.equal(s.atTarget, 1);
   assert.ok(Math.abs(s.saving - 24) < 1e-9);

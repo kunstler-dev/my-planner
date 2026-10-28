@@ -9,6 +9,7 @@ import { convert } from '../planner-calc.js';
 import {
   parseSteamAppId,
   applyPrice,
+  STEAM_CURRENCY,
   wishlistSummary,
   dotaMedal,
   faceitLevel,
@@ -33,9 +34,20 @@ const TABS = [
   ['clips', 'Контент'],
 ];
 
-const eur = (v) => `${(Math.round(v * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 })} €`;
-/** Steam prices are in euro; show the main currency next to them when it's hryvnia. */
-const priceText = (v) => (state.data.settings.currency === '€' ? eur(v) : `${eur(v)} ≈ ${money(convert(v, '€', state.data.settings.currency, state.data.rates))}`);
+// Prices come from the Ukrainian Steam store (₴); older items may still be in another currency.
+const fmtPrice = (v, cur = '₴') => `${(Math.round(v * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 })} ${cur}`;
+const toMain = (v, cur = '₴') => convert(v, cur, state.data.settings.currency, state.data.rates);
+/** Store price, plus the main currency next to it when they differ. */
+const priceText = (v, cur = '₴') => (cur === state.data.settings.currency ? fmtPrice(v, cur) : `${fmtPrice(v, cur)} ≈ ${money(toMain(v, cur))}`);
+const isPlaceholderName = (name) => !name || /^App \d+$/.test(name);
+// Names are looked up once per session, so a game Steam doesn't know isn't requested on every render.
+const triedNames = new Set();
+
+/** Full info for one game: real name, capsule image and price (used for links and old placeholder names). */
+async function fetchApp(id) {
+  const res = await window.api.steam.app(id);
+  return res.ok ? res : null;
+}
 
 function tile(label, value, note, dark, onclick) {
   return h(
@@ -71,17 +83,29 @@ export async function refreshPrices({ silent = false } = {}) {
       return next;
     });
   });
+  for (const i of state.data.wishlist.filter((x) => isPlaceholderName(x.name) && !triedNames.has(x.id))) {
+    triedNames.add(i.id);
+    const info = await fetchApp(i.id);
+    if (info) update((d) => Object.assign(d.wishlist.find((x) => x.id === i.id), { name: info.name, image: info.image || i.image }));
+  }
   if (!silent) toast('Цены обновлены');
   else if (newSales) toast(`Новые скидки в вишлисте: ${newSales}`);
 }
 
 async function addGame(id, name, image) {
   if (state.data.wishlist.some((i) => i.id === id)) return toast('Уже в вишлисте');
-  update((d) => d.wishlist.push({ id, name, image: image || `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${id}/capsule_231x87.jpg`, target: null, history: [], addedAt: today() }));
-  const res = await window.api.steam.prices([id]);
-  const entry = res.ok && res.prices[id];
-  if (entry?.success) update((d) => (d.wishlist = d.wishlist.map((i) => (i.id === id ? applyPrice(i, Array.isArray(entry.data) ? null : entry.data.price_overview, today()) : i))));
-  toast(`${name} — в вишлисте`);
+  const info = await fetchApp(id);
+  if (!info && !name) return toast('Игра не найдена в Steam — проверь ссылку');
+  const item = {
+    id,
+    name: info?.name || name,
+    image: info?.image || image || `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${id}/capsule_231x87.jpg`,
+    target: null,
+    history: [],
+    addedAt: today(),
+  };
+  update((d) => d.wishlist.push(info ? applyPrice(item, info.overview, today()) : item));
+  toast(`${item.name} — в вишлисте`);
 }
 
 function searchModal() {
@@ -92,7 +116,7 @@ function searchModal() {
     const q = input.value.trim();
     const appId = parseSteamAppId(q);
     if (appId) {
-      results.replaceChildren(h('div', { class: 'list-row', style: { cursor: 'pointer' }, onclick: () => (addGame(appId, `App ${appId}`), modal.close()) }, h('div', { class: 'grow' }, `Добавить игру #${appId} по ссылке`)));
+      results.replaceChildren(h('div', { class: 'list-row', style: { cursor: 'pointer' }, onclick: () => (addGame(appId, null), modal.close()) }, h('div', { class: 'grow' }, `Добавить игру #${appId} по ссылке`)));
       return;
     }
     if (q.length < 2) return results.replaceChildren();
@@ -115,7 +139,7 @@ function searchModal() {
               },
               h('img', { src: it.tiny_image, class: 'capsule', width: 92, height: 35, alt: '' }),
               h('div', { class: 'grow title' }, it.name),
-              h('div', { class: 'meta' }, it.price ? eur(it.price.final / 100) : 'бесплатно'),
+              h('div', { class: 'meta' }, it.price ? fmtPrice(it.price.final / 100, STEAM_CURRENCY[it.price.currency]) : 'бесплатно'),
             ),
           )
         : [h('p', { class: 'muted' }, 'Ничего не нашлось')]),
@@ -131,7 +155,7 @@ function searchModal() {
 function targetModal(item) {
   formModal(
     item.name,
-    [{ key: 'target', label: 'Куплю, если цена станет не выше, €', type: 'number', placeholder: 'например, 20' }],
+    [{ key: 'target', label: `Куплю, если цена станет не выше, ${item.currency || '₴'}`, type: 'number', placeholder: 'например, 500' }],
     { target: item.target ?? '' },
     {
       onSave: (v) => update((d) => (d.wishlist.find((i) => i.id === item.id).target = v.target > 0 ? v.target : null)),
@@ -154,8 +178,8 @@ function wishRow(i) {
         'div',
         { class: 'meta' },
         [
-          i.lowest != null && i.history?.length > 1 && `мин. ${eur(i.lowest)}`,
-          i.target > 0 && (hit ? `🎯 цель ${eur(i.target)} достигнута` : `цель ${eur(i.target)}`),
+          i.lowest != null && i.history?.length > 1 && `мин. ${fmtPrice(i.lowest, i.currency)}`,
+          i.target > 0 && (hit ? `🎯 цель ${fmtPrice(i.target, i.currency)} достигнута` : `цель ${fmtPrice(i.target, i.currency)}`),
           i.updatedAt && `проверено ${prettyDate(i.updatedAt)}`,
         ]
           .filter(Boolean)
@@ -166,7 +190,7 @@ function wishRow(i) {
     h(
       'div',
       { style: { textAlign: 'right', minWidth: '96px' } },
-      i.price == null ? h('div', { class: 'meta' }, 'нет цены') : [i.discount > 0 && h('div', { class: 'meta strike' }, eur(i.initial)), h('div', { class: 'amount' }, priceText(i.price))],
+      i.price == null ? h('div', { class: 'meta' }, 'нет цены') : [i.discount > 0 && h('div', { class: 'meta strike' }, fmtPrice(i.initial, i.currency)), h('div', { class: 'amount' }, priceText(i.price, i.currency))],
     ),
     h('button', { class: 'btn ghost sm icon-only', title: 'Цель по цене / удалить', onclick: () => targetModal(i) }, icon('edit', 15)),
     h('a', { class: 'btn ghost sm icon-only', title: 'Открыть в Steam', href: `https://store.steampowered.com/app/${i.id}/`, target: '_blank' }, icon('up', 15)),
@@ -175,16 +199,16 @@ function wishRow(i) {
 
 function wishlistTab() {
   const items = state.data.wishlist;
-  if (items.some((i) => i.updatedAt !== today())) setTimeout(() => refreshPrices({ silent: true }), 0);
-  const s = wishlistSummary(items);
+  if (items.some((i) => i.updatedAt !== today() || (i.price != null && i.currency !== '₴') || (isPlaceholderName(i.name) && !triedNames.has(i.id)))) setTimeout(() => refreshPrices({ silent: true }), 0);
+  const s = wishlistSummary(items, toMain);
   const sorted = [...items].sort((a, b) => (b.discount || 0) - (a.discount || 0) || (a.price ?? 1e9) - (b.price ?? 1e9));
   return [
     h(
       'div',
       { class: 'grid cols-4', style: { marginBottom: '16px' } },
-      tile('Со скидкой сейчас', String(s.onSale), s.onSale ? `экономия ${eur(s.saving)}` : 'скидок нет', true),
+      tile('Со скидкой сейчас', String(s.onSale), s.onSale ? `экономия ${money(s.saving)}` : 'скидок нет', true),
       tile('Достигли твоей цены', String(s.atTarget), 'задай цель кнопкой ✎'),
-      tile('Весь вишлист', eur(s.total), `${items.length} игр`),
+      tile('Весь вишлист', money(s.total), `${items.length} игр · цены украинского Steam`),
       tile('Бюджет на игры · месяц', money(state.data.budgets['Игры'] || 0), state.data.budgets['Игры'] ? 'лимит категории «Игры»' : 'задай в Финансы → Бюджеты'),
     ),
     card(
@@ -195,7 +219,7 @@ function wishlistTab() {
         h('button', { class: 'btn sm', disabled: refreshing || !items.length, onclick: () => refreshPrices() }, icon('refresh', 14), refreshing ? 'Проверяю…' : 'Цены'),
         h('button', { class: 'btn primary sm', onclick: searchModal }, icon('plus', 14), 'Игра'),
       ),
-      items.length ? h('div', { class: 'list' }, sorted.map(wishRow)) : empty('Добавь игры, которые хочешь купить — цены из Steam (DE) проверяются каждый день, скидки всплывают сверху.'),
+      items.length ? h('div', { class: 'list' }, sorted.map(wishRow)) : empty('Добавь игры, которые хочешь купить — цены украинского Steam проверяются каждый день, скидки всплывают сверху.'),
     ),
   ];
 }
