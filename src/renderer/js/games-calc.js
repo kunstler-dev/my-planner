@@ -80,6 +80,24 @@ export function deadlockName(value) {
   return `${DEADLOCK_TIERS[tier]} ${(v % 6) + 1}`;
 }
 
+/**
+ * MMR / ELO input: «3320» sets the value, «+25» / «-30» (also «−30») changes the current one.
+ * Returns the new value or null for bad input (or a change with nothing to change yet).
+ */
+export function parseRankInput(text, current) {
+  const s = String(text || '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace('−', '-')
+    .replace(',', '.');
+  const m = s.match(/^([+-])?(\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  const n = Number(m[2]);
+  if (!m[1]) return n;
+  if (current == null) return null;
+  return Math.max(0, current + (m[1] === '-' ? -n : n));
+}
+
 /** Track numbers for a list of entries [{ date, value }]: current, change over 30 days, distance to goal. */
 export function rankProgress(entries, goal, todayStr) {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));

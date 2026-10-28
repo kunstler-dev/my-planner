@@ -18,6 +18,7 @@ import {
   deadlockValue,
   deadlockName,
   rankProgress,
+  parseRankInput,
   CLIP_STATUSES,
   PLATFORMS,
   clipViews,
@@ -318,19 +319,37 @@ function quickEntry(key) {
       h('button', { class: 'btn primary', type: 'submit' }, 'Сохранить'),
     );
   }
-  const input = h('input', { class: 'input', type: 'number', min: 0, step: 1, placeholder: `Текущий ${t.unit}`, style: { flex: 1 } });
+  const input = h('input', {
+    class: 'input',
+    inputmode: 'numeric',
+    placeholder: last != null ? `${Math.round(last)} или +25 / −25` : `Текущий ${t.unit}`,
+    title: 'Число — новое значение, +25 или −25 — изменение к текущему',
+    style: { flex: 1 },
+  });
+  const step = (delta) =>
+    last != null &&
+    h(
+      'button',
+      { class: 'btn sm', type: 'button', title: delta > 0 ? 'Победа' : 'Поражение', onclick: () => saveToday(key, Math.max(0, last + delta)) },
+      delta > 0 ? `+${delta}` : `−${-delta}`,
+    );
   return h(
     'form',
     {
       class: 'row quick-rank',
       onsubmit: (e) => {
         e.preventDefault();
-        const v = Number(String(input.value).replace(',', '.'));
-        if (!input.value || !(v >= 0)) return input.focus();
+        const v = parseRankInput(input.value, last);
+        if (v == null) {
+          toast(last == null && /^[+−-]/.test(input.value.trim()) ? `Сначала впиши текущий ${t.unit} числом` : 'Впиши число, например 3320, или изменение: +25 / −25');
+          return input.focus();
+        }
         saveToday(key, v);
       },
     },
     input,
+    step(25),
+    step(-25),
     h('button', { class: 'btn primary', type: 'submit' }, 'Сохранить'),
   );
 }

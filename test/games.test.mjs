@@ -10,6 +10,7 @@ import {
   deadlockValue,
   deadlockName,
   rankProgress,
+  parseRankInput,
   clipStats,
 } from '../src/renderer/js/games-calc.js';
 
@@ -69,6 +70,18 @@ test('rank progress over 30 days and to the goal', () => {
   );
   assert.deepEqual(p, { current: 3300, change30: 200, toGoal: 700, best: 3300 });
   assert.equal(rankProgress([], null, '2026-10-28').current, null);
+});
+
+test('rank input: absolute value or a change to the current one', () => {
+  assert.equal(parseRankInput('3320', 3000), 3320);
+  assert.equal(parseRankInput('+25', 3320), 3345);
+  assert.equal(parseRankInput('-30', 3320), 3290);
+  assert.equal(parseRankInput('−30', 3320), 3290);
+  assert.equal(parseRankInput(' + 25 ', 3320), 3345);
+  assert.equal(parseRankInput('+25', null), null);
+  assert.equal(parseRankInput('-50', 20), 0);
+  assert.equal(parseRankInput('abc', 3000), null);
+  assert.equal(parseRankInput('', 3000), null);
 });
 
 test('clip stats count only published clips', () => {
