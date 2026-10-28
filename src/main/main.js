@@ -22,7 +22,15 @@ const chats = new Map();
 const GROK_PARTITION = 'persist:grok';
 const GROK_URL = 'https://grok.com/';
 const GROK_HOSTS = [/(^|\.)grok\.com$/, /(^|\.)x\.ai$/, /(^|\.)x\.com$/, /(^|\.)twitter\.com$/, /(^|\.)twimg\.com$/];
-const AUTH_HOSTS = [/^accounts\.google\.com$/, /(^|\.)googleusercontent\.com$/, /^appleid\.apple\.com$/, /(^|\.)cloudflare\.com$/];
+const AUTH_HOSTS = [
+  /^accounts\.google\.com$/,
+  /(^|\.)googleusercontent\.com$/,
+  /^appleid\.apple\.com$/,
+  /(^|\.)cloudflare\.com$/,
+  /^github\.com$/,
+  /(^|\.)githubassets\.com$/,
+  /(^|\.)githubusercontent\.com$/,
+];
 // A plain Chrome user agent: some sign-in pages refuse anything that says "Electron".
 const CHROME_UA = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
 
