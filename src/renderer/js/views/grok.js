@@ -252,9 +252,27 @@ function keyCard() {
 }
 
 const MODES = [
-  ['web', 'Подписка grok.com'],
+  ['web', 'Внутри приложения'],
+  ['browser', 'В браузере'],
   ['api', 'API-ключ'],
 ];
+
+// Windows can't hand very long links to the browser; longer prompts go through the clipboard instead.
+const MAX_LINK = 2000;
+
+/** Opens grok.com in the user's own browser (their usual login) with the prompt prefilled via ?q=. */
+export function openGrokInBrowser(text) {
+  if (!text) return window.open('https://grok.com/', '_blank');
+  navigator.clipboard.writeText(text).catch(() => {});
+  const url = `https://grok.com/?q=${encodeURIComponent(text)}`;
+  if (url.length <= MAX_LINK) {
+    window.open(url, '_blank');
+    toast('Открыл Grok в браузере — подтверди отправку там');
+  } else {
+    window.open('https://grok.com/', '_blank');
+    toast('Запрос длинный — он скопирован, вставь его в Grok через Ctrl+V');
+  }
+}
 
 function modeSeg() {
   const mode = state.data.settings.grokMode;
@@ -271,6 +289,38 @@ export async function sendToGrokWeb(text) {
   toast('Вставляю запрос в Grok…');
   const ok = await fillGrokWeb(text);
   toast(ok ? 'Запрос вставлен — проверь и нажми Enter в Grok' : 'Не нашёл поле ввода — запрос скопирован, вставь его через Ctrl+V');
+}
+
+function browserPage(pending) {
+  if (pending) setTimeout(() => openGrokInBrowser(pending), 0);
+  return h(
+    'div',
+    { class: 'page' },
+    h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Grok'), h('div', { class: 'sub' }, 'Grok открывается в твоём браузере — там, где ты уже вошёл (через Google, GitHub, X)')), modeSeg()),
+    card(
+      'Быстрые запросы',
+      h('button', { class: 'btn primary', onclick: () => openGrokInBrowser(null) }, icon('up', 16), 'Открыть grok.com'),
+      h('p', { class: 'muted', style: { marginTop: 0 } }, 'Запрос с твоими цифрами откроется в браузере уже вписанным — останется подтвердить отправку. Длинный запрос копируется в буфер, его вставляешь через Ctrl+V.'),
+      h(
+        'div',
+        { class: 'chips' },
+        QUICK.map(([label, make]) =>
+          h(
+            'button',
+            {
+              class: 'chip',
+              onclick: () => {
+                const p = make();
+                if (!p) return toast('Сначала подключи канал во вкладке «Telegram-каналы»');
+                openGrokInBrowser(p);
+              },
+            },
+            label,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 function webPage(pending) {
@@ -336,6 +386,7 @@ export function grokView() {
   const page = h('div', { class: 'page' });
   const pending = state.viewOpts?.prompt;
   state.viewOpts = null;
+  if (state.data.settings.grokMode === 'browser') return browserPage(pending);
   if (state.data.settings.grokMode !== 'api') return webPage(pending);
 
   const head = h(

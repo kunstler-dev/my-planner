@@ -1,7 +1,7 @@
 {
   "name": "planner",
   "productName": "Planner",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Чёрно-белый планер: доходы и расходы, аналитика Telegram-каналов, Grok",
   "main": "src/main/main.js",
   "author": "kunstler-dev",

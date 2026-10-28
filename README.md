@@ -17,7 +17,7 @@ Russian. All data stays on the local machine; there is no sync.
 | **Tasks & habits**      | Tasks by date (overdue, today, tomorrow, later) and daily habits with streaks. |
 | **Notes**               | Quick notes with search and pinning. |
 | **Games**               | **Steam wishlist** (search the store or paste a link; hryvnia prices from the Ukrainian store checked daily, discounts, lowest price seen, target price), **ranks** (Dota 2 MMR with the approximate medal, FACEIT ELO and level, Deadlock rank up to Eternus — history, goals, notes after games, Grok finds repeated mistakes), **content** (game clips from idea to published, views on TikTok / Shorts / YouTube, Grok scripts and ideas). |
-| **Grok**                | Two modes: grok.com inside the app with your own subscription (sign in once, the session is kept, no API costs; quick prompts with your numbers are pasted into its message box), or a streaming chat through the xAI API with your own key (encrypted with Windows DPAPI). |
+| **Grok**                | Three modes: grok.com inside the app with your own subscription (sign in once, the session is kept, no API costs; quick prompts with your numbers are pasted into its message box), grok.com in your own browser (for Google sign-in, which embedded windows block; prompts open prefilled via ?q=), or a streaming chat through the xAI API with your own key (encrypted with Windows DPAPI). |
 | **Settings**            | Grok mode, key and model, light/dark theme, your own background picture (with a dimming slider) and banner video/GIF behind the logo — stored in the data folder, never in the repo, pets on/off and black-and-white or coloured, currency, data folder. |
 
 ## Download

@@ -158,10 +158,11 @@ export function settingsView() {
           { class: 'list' },
           settingRow(
             'Режим',
-            'Подписка — grok.com внутри планера с твоим аккаунтом, без оплаты за токены. API-ключ — свой чат через xAI API, токены оплачиваются отдельно.',
+            'Подписка без оплаты за токены: grok.com внутри планера или в твоём браузере (если входишь через Google — выбери «В браузере»). API-ключ — свой чат через xAI API, токены оплачиваются отдельно.',
             seg(
               [
-                ['web', 'Подписка grok.com'],
+                ['web', 'Внутри'],
+                ['browser', 'В браузере'],
                 ['api', 'API-ключ'],
               ],
               s.grokMode,
@@ -175,7 +176,7 @@ export function settingsView() {
               keyControls(),
             ),
           s.grokMode === 'api' && modelRow(),
-          s.grokMode !== 'api' &&
+          s.grokMode === 'web' &&
             settingRow(
               'Аккаунт grok.com',
               'Вход хранится только в планере. Выйти можно здесь или на вкладке Grok.',
