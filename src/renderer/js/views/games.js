@@ -322,35 +322,33 @@ function quickEntry(key) {
   const input = h('input', {
     class: 'input',
     inputmode: 'numeric',
-    placeholder: last != null ? `${Math.round(last)} или +25 / −25` : `Текущий ${t.unit}`,
-    title: 'Число — новое значение, +25 или −25 — изменение к текущему',
-    style: { flex: 1 },
+    placeholder: last != null ? 'Сколько' : `Текущий ${t.unit}`,
+    style: { flex: 1, minWidth: '90px' },
   });
-  const step = (delta) =>
-    last != null &&
-    h(
-      'button',
-      { class: 'btn sm', type: 'button', title: delta > 0 ? 'Победа' : 'Поражение', onclick: () => saveToday(key, Math.max(0, last + delta)) },
-      delta > 0 ? `+${delta}` : `−${-delta}`,
-    );
+  /** mode: 'add' | 'sub' | 'set'. A typed «+25» / «−25» also works with any button. */
+  const apply = (mode) => {
+    const raw = input.value.trim();
+    const signed = /^[+−-]/.test(raw);
+    const amount = parseRankInput(raw.replace(/^[+−-]/, ''), null);
+    if (amount == null) {
+      toast('Впиши число');
+      return input.focus();
+    }
+    let value;
+    if (mode === 'set' && !signed) value = amount;
+    else if (last == null) {
+      toast(`Сначала задай текущий ${t.unit}`);
+      return input.focus();
+    } else value = parseRankInput(signed ? raw : `${mode === 'sub' ? '-' : '+'}${amount}`, last);
+    saveToday(key, value);
+  };
   return h(
     'form',
-    {
-      class: 'row quick-rank',
-      onsubmit: (e) => {
-        e.preventDefault();
-        const v = parseRankInput(input.value, last);
-        if (v == null) {
-          toast(last == null && /^[+−-]/.test(input.value.trim()) ? `Сначала впиши текущий ${t.unit} числом` : 'Впиши число, например 3320, или изменение: +25 / −25');
-          return input.focus();
-        }
-        saveToday(key, v);
-      },
-    },
+    { class: 'row quick-rank', onsubmit: (e) => (e.preventDefault(), apply(last != null ? 'add' : 'set')) },
     input,
-    step(25),
-    step(-25),
-    h('button', { class: 'btn primary', type: 'submit' }, 'Сохранить'),
+    last != null && h('button', { class: 'btn', type: 'button', title: 'Прибавить к текущему', onclick: () => apply('add') }, '+ Добавить'),
+    last != null && h('button', { class: 'btn', type: 'button', title: 'Отнять от текущего', onclick: () => apply('sub') }, '− Отнять'),
+    h('button', { class: `btn${last == null ? ' primary' : ' ghost'}`, type: 'button', title: 'Записать это число как текущее значение', onclick: () => apply('set') }, last == null ? 'Сохранить' : 'Задать'),
   );
 }
 

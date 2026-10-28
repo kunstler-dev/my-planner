@@ -1225,3 +1225,6 @@ textarea.input {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.quick-rank {
+  flex-wrap: wrap;
+}
