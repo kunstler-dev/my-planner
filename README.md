@@ -1,7 +1,7 @@
 # Planner
 
 A black-and-white Windows desktop planner: income & expense tracking (euro or hryvnia), analytics for public
-Telegram channels, Dota 2 / Deadlock / CS2 stats for one Steam account, a Grok (xAI) assistant, today's tasks — and the pet corner from
+Telegram channels, a Grok (xAI) assistant, today's tasks — and the pet corner from
 [Kitten Planner](https://github.com/kunstler-dev/kitten-planner). The interface is in Russian.
 All data stays on the local machine; there is no sync.
 
@@ -12,8 +12,7 @@ All data stays on the local machine; there is no sync.
 | **Home**             | Today's tasks (quick add, move to tomorrow), month income/expenses, subscribers and reach at a glance, latest operations.                                                                                                                             |
 | **Finance**          | Income/expense records with categories and notes, month switcher, totals vs. previous month, saved share of income, expenses and income by category, 12-month chart, CSV export (Excel-friendly).                                                    |
 | **Telegram channels** | Any number of channels with a switcher. Reads the public page `t.me/s/<channel>` (no bot, no API key): subscribers (a snapshot per day, past values can be entered by hand), average reach for 7/30 days, ERR, posts per week, reach of the last posts, best weekday and time to post, top posts. |
-| **Games**            | One Steam profile link → Dota 2 via OpenDota (rank, win rate, recent matches, heroes), Deadlock via deadlock-api.com (rank, win rate, matches, heroes from the match history) and CS2 via Leetify (Premier, FACEIT, aim/positioning/utility, shooting stats, recent matches). No keys needed. |
-| **Grok**             | Streaming chat with the xAI API using your own key (encrypted with Windows DPAPI). Quick prompts send your finance and channel numbers along: finance review, channels review, post ideas, game review, weekly plan. Model is selectable.                          |
+| **Grok**             | Streaming chat with the xAI API using your own key (encrypted with Windows DPAPI). Quick prompts send your finance and channel numbers along: finance review, channels review, post ideas, weekly plan. Model is selectable.                          |
 | **Settings**         | xAI key and model (list loaded from the API), light/dark theme, pets on/off and black-and-white or coloured, currency (€ or ₴), data folder.                                                                                                           |
 
 ## Download
@@ -26,7 +25,7 @@ Grab `Planner-<version>-portable.exe` from the [latest release](https://github.c
 npm install
 npm start            # npm run dev opens DevTools
 npx electron scripts/make-icons.js   # build/icon.svg → icon.png + icon.ico
-npm test             # unit tests: finance math, channel parser, game stats, data migration, Grok streaming
+npm test             # unit tests: finance math, channel parser, data migration, Grok streaming
 npm run dist:win     # portable .exe → dist/Planner-<version>-portable.exe
 npx electron scripts/screenshots.js shots durov   # demo data + screenshots of every screen
 ```

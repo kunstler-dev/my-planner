@@ -12,7 +12,9 @@ contextBridge.exposeInMainWorld('api', {
   setTheme: (theme) => ipcRenderer.invoke('theme:set', theme),
   saveFile: (name, content) => ipcRenderer.invoke('file:save', { name, content }),
   tgFetch: (username, before) => ipcRenderer.invoke('tg:fetch', { username, before }),
-  get: (url) => ipcRenderer.invoke('net:get', url),
+  grokWeb: {
+    logout: () => ipcRenderer.invoke('grokweb:logout'),
+  },
   grok: {
     hasKey: () => ipcRenderer.invoke('grok:hasKey'),
     setKey: (key) => ipcRenderer.invoke('grok:setKey', key),

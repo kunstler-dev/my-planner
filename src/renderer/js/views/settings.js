@@ -42,6 +42,68 @@ export function settingsView() {
     onchange: (e) => update((d) => (d.settings.grokModel = e.target.value.trim() || 'grok-4'), { silent: true }),
   });
 
+  const keyControls = () =>
+    h(
+      'div',
+      { class: 'row' },
+      keyInput,
+      h(
+        'button',
+        {
+          class: 'btn primary',
+          onclick: async () => {
+            if (!keyInput.value.trim()) return;
+            keySet = await window.api.grok.setKey(keyInput.value.trim());
+            resetGrokKeyCache();
+            models = null;
+            toast('Ключ сохранён');
+            update(() => {});
+          },
+        },
+        'Сохранить',
+      ),
+      keySet &&
+        h(
+          'button',
+          {
+            class: 'btn ghost',
+            onclick: async () => {
+              keySet = await window.api.grok.setKey('');
+              resetGrokKeyCache();
+              toast('Ключ удалён');
+              update(() => {});
+            },
+          },
+          'Удалить',
+        ),
+    );
+  const modelRow = () =>
+    settingRow(
+      'Модель',
+      models ? `Доступно моделей: ${models.length}` : 'По умолчанию grok-4. Список доступных моделей можно загрузить с xAI.',
+      h(
+        'div',
+        { class: 'row' },
+        modelInput,
+        h('datalist', { id: 'grok-models' }, (models || []).map((m) => h('option', { value: m }))),
+        h(
+          'button',
+          {
+            class: 'btn',
+            disabled: !keySet,
+            onclick: async () => {
+              const res = await window.api.grok.models();
+              if (!res.ok) return toast(res.code === 'bad_key' ? 'Ключ не подошёл' : `Не удалось: ${res.message || res.code}`);
+              models = res.models;
+              toast(`Моделей: ${models.length}. Выбери в поле «Модель».`);
+              update(() => {});
+            },
+          },
+          'Загрузить список моделей',
+        ),
+      ),
+    );
+
   return h(
     'div',
     { class: 'page', style: { maxWidth: '820px' } },
@@ -56,68 +118,40 @@ export function settingsView() {
           'div',
           { class: 'list' },
           settingRow(
-            'Ключ API',
-            h('span', {}, keySet ? 'Сохранён, зашифрован на этом компьютере. ' : 'Не задан. ', 'Получить: ', h('a', { href: 'https://console.x.ai', target: '_blank', style: { color: 'inherit' } }, 'console.x.ai'), ' → API Keys.'),
-            h(
-              'div',
-              { class: 'row' },
-              keyInput,
-              h(
-                'button',
-                {
-                  class: 'btn primary',
-                  onclick: async () => {
-                    if (!keyInput.value.trim()) return;
-                    keySet = await window.api.grok.setKey(keyInput.value.trim());
-                    resetGrokKeyCache();
-                    models = null;
-                    toast('Ключ сохранён');
-                    update(() => {});
-                  },
-                },
-                'Сохранить',
-              ),
-              keySet &&
-                h(
-                  'button',
-                  {
-                    class: 'btn ghost',
-                    onclick: async () => {
-                      keySet = await window.api.grok.setKey('');
-                      resetGrokKeyCache();
-                      toast('Ключ удалён');
-                      update(() => {});
-                    },
-                  },
-                  'Удалить',
-                ),
+            'Режим',
+            'Подписка — grok.com внутри планера с твоим аккаунтом, без оплаты за токены. API-ключ — свой чат через xAI API, токены оплачиваются отдельно.',
+            seg(
+              [
+                ['web', 'Подписка grok.com'],
+                ['api', 'API-ключ'],
+              ],
+              s.grokMode,
+              (v) => update((d) => (d.settings.grokMode = v)),
             ),
           ),
-          settingRow(
-            'Модель',
-            models ? `Доступно моделей: ${models.length}` : 'По умолчанию grok-4. Список доступных моделей можно загрузить с xAI.',
-            h(
-              'div',
-              { class: 'row' },
-              modelInput,
-              h('datalist', { id: 'grok-models' }, (models || []).map((m) => h('option', { value: m }))),
+          s.grokMode === 'api' &&
+            settingRow(
+              'Ключ API',
+              h('span', {}, keySet ? 'Сохранён, зашифрован на этом компьютере. ' : 'Не задан. ', 'Получить: ', h('a', { href: 'https://console.x.ai', target: '_blank', style: { color: 'inherit' } }, 'console.x.ai'), ' → API Keys.'),
+              keyControls(),
+            ),
+          s.grokMode === 'api' && modelRow(),
+          s.grokMode !== 'api' &&
+            settingRow(
+              'Аккаунт grok.com',
+              'Вход хранится только в планере. Выйти можно здесь или на вкладке Grok.',
               h(
                 'button',
                 {
                   class: 'btn',
-                  disabled: !keySet,
                   onclick: async () => {
-                    const res = await window.api.grok.models();
-                    if (!res.ok) return toast(res.code === 'bad_key' ? 'Ключ не подошёл' : `Не удалось: ${res.message || res.code}`);
-                    models = res.models;
-                    toast(`Моделей: ${models.length}. Выбери в поле «Модель».`);
-                    update(() => {});
+                    await window.api.grokWeb.logout();
+                    toast('Вышел из grok.com');
                   },
                 },
-                'Загрузить список моделей',
+                'Выйти из grok.com',
               ),
             ),
-          ),
         ),
       ),
       card(

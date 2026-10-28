@@ -7,11 +7,10 @@ const CURRENCIES = ['€', '₴'];
 function defaultData() {
   return {
     version: 2,
-    settings: { theme: 'light', currency: '€', pets: true, petsColor: false, grokModel: 'grok-4', activeChannel: '' },
+    settings: { theme: 'light', currency: '€', pets: true, petsColor: false, grokModel: 'grok-4', grokMode: 'web', activeChannel: '' },
     finance: [],
     tasks: [],
     channels: [],
-    games: { steamId: '', accountId: 0, persona: '', avatar: '', tab: 'dota', dota: null, deadlock: null, cs: null },
     chat: [],
   };
 }
@@ -37,7 +36,6 @@ function normalize(raw) {
     finance: Array.isArray(raw.finance) ? raw.finance : [],
     tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
     channels,
-    games: { ...d.games, ...(raw.games || {}) },
     chat: Array.isArray(raw.chat) ? raw.chat : [],
   };
 }

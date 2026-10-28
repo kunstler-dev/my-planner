@@ -1,12 +1,13 @@
-// Grok chat (xAI API). The key lives encrypted in the main process; answers stream in.
+// Grok tab, two modes: 'web' — grok.com inside the app with the user's own subscription (no API costs);
+// 'api' — chat through the xAI API with a key (paid per token), the key lives encrypted in the main process.
 import { state, update, save } from '../state.js';
 import { h, icon, card, toast, uid, money } from '../ui.js';
 import { markdown } from '../markdown.js';
 import { today, thisMonth, shiftMonth, monthTitle } from '../dates.js';
 import { totals, inMonth, byCategory } from '../finance-calc.js';
 import { summaryForAI } from '../tg.js';
-import { gameSummary } from '../games-calc.js';
 import { go } from '../app.js';
+import { showGrokWeb, fillGrokWeb, grokWeb } from '../grok-web.js';
 
 const ERRORS = {
   no_key: 'Не задан ключ xAI API. Добавь его в Настройках.',
@@ -19,7 +20,7 @@ const ERRORS = {
 
 const SYSTEM =
   'Ты — Grok, личный помощник в приложении-планере. Отвечай по-русски, по делу и конкретно, без воды. ' +
-  'Пользователь ведёт учёт доходов и расходов, развивает свои Telegram-каналы и играет в Dota 2, Deadlock и CS2. Когда даёшь советы — опирайся на цифры, ' +
+  'Пользователь ведёт учёт доходов и расходов и развивает свои Telegram-каналы. Когда даёшь советы — опирайся на цифры, ' +
   'которые он прислал, и предлагай конкретные шаги. Форматируй ответы коротким Markdown (заголовки, списки).';
 
 let hasKey = null;
@@ -46,13 +47,6 @@ function channelsSummary() {
   return state.data.channels.map((c) => summaryForAI(c, today())).join('\n\n---\n\n');
 }
 
-function gamesSummary() {
-  return ['dota', 'deadlock', 'cs']
-    .map((k) => state.data.games[k]?.data && gameSummary(k, state.data.games[k].data))
-    .filter(Boolean)
-    .join('\n\n---\n\n');
-}
-
 const QUICK = [
   ['Разбор моих финансов', () => `Посмотри на мои финансы и скажи, где я теряю деньги и что можно урезать. Дай 3–5 конкретных советов.\n\n${financeSummary()}`],
   [
@@ -68,13 +62,6 @@ const QUICK = [
       state.data.channels.length
         ? `Предложи по 7 идей для постов на ближайшие две недели для каждого моего канала, в их стиле. Учитывай, какие посты набрали больше охвата.\n\n${channelsSummary()}`
         : 'Предложи 10 идей для постов в Telegram-канал. Сначала спроси меня, о чём канал, если это непонятно.',
-  ],
-  [
-    'Разбор моих игр',
-    () => {
-      const s = gamesSummary();
-      return s ? `Разбери мою игру по этой статистике: в чём я силён, что проседает, что тренировать в первую очередь в каждой игре.\n\n${s}` : null;
-    },
   ],
   ['План на неделю', () => 'Помоги составить план на неделю: спроси, какие у меня цели и дела, и разложи их по дням.'],
 ];
@@ -180,7 +167,7 @@ function renderLog() {
                 class: 'chip',
                 onclick: () => {
                   const p = make();
-                  if (!p) return toast(label.includes('игр') ? 'Сначала подключи Steam во вкладке «Игры»' : 'Сначала подключи канал во вкладке «Telegram-каналы»');
+                  if (!p) return toast('Сначала подключи канал во вкладке «Telegram-каналы»');
                   send(p);
                 },
               },
@@ -229,10 +216,92 @@ function keyCard() {
   );
 }
 
+const MODES = [
+  ['web', 'Подписка grok.com'],
+  ['api', 'API-ключ'],
+];
+
+function modeSeg() {
+  const mode = state.data.settings.grokMode;
+  return h(
+    'div',
+    { class: 'seg' },
+    MODES.map(([k, label]) => h('button', { class: mode === k ? 'on' : '', onclick: () => update((d) => (d.settings.grokMode = k)) }, label)),
+  );
+}
+
+/** Puts a prompt into grok.com (subscription mode); copies it to the clipboard as a fallback. */
+export async function sendToGrokWeb(text) {
+  navigator.clipboard.writeText(text).catch(() => {});
+  toast('Вставляю запрос в Grok…');
+  const ok = await fillGrokWeb(text);
+  toast(ok ? 'Запрос вставлен — проверь и нажми Enter в Grok' : 'Не нашёл поле ввода — запрос скопирован, вставь его через Ctrl+V');
+}
+
+function webPage(pending) {
+  const slot = h('div', { class: 'grok-web' });
+  const tool = (iconName, title, fn) => h('button', { class: 'btn ghost sm icon-only', title, onclick: fn }, icon(iconName, 16));
+  setTimeout(() => {
+    showGrokWeb(slot);
+    if (pending) sendToGrokWeb(pending);
+  }, 0);
+  return h(
+    'div',
+    { class: 'page page-wide' },
+    h(
+      'div',
+      { class: 'page-head', style: { marginBottom: '14px' } },
+      h('div', {}, h('h1', {}, 'Grok'), h('div', { class: 'sub' }, 'Твоя подписка на grok.com — без оплаты за токены. Войди один раз, вход сохранится.')),
+      modeSeg(),
+    ),
+    h(
+      'div',
+      { class: 'row', style: { marginBottom: '12px', flexWrap: 'wrap' } },
+      h(
+        'div',
+        { class: 'chips' },
+        QUICK.map(([label, make]) =>
+          h(
+            'button',
+            {
+              class: 'chip',
+              title: 'Вставить запрос с твоими цифрами в Grok',
+              onclick: () => {
+                const p = make();
+                if (!p) return toast('Сначала подключи канал во вкладке «Telegram-каналы»');
+                sendToGrokWeb(p);
+              },
+            },
+            label,
+          ),
+        ),
+      ),
+      h('div', { class: 'spacer' }),
+      tool('left', 'Назад', grokWeb.back),
+      tool('refresh', 'Обновить страницу', grokWeb.reload),
+      tool('home', 'На главную grok.com', grokWeb.home),
+      h(
+        'button',
+        {
+          class: 'btn ghost sm',
+          onclick: async () => {
+            if (!confirm('Выйти из аккаунта grok.com в планере?')) return;
+            await grokWeb.logout();
+            toast('Вышел из grok.com');
+          },
+        },
+        'Выйти',
+      ),
+    ),
+    slot,
+  );
+}
+
 export function grokView() {
   const page = h('div', { class: 'page' });
   const pending = state.viewOpts?.prompt;
   state.viewOpts = null;
+  if (state.data.settings.grokMode !== 'api') return webPage(pending);
 
   const head = h(
     'div',
@@ -241,6 +310,7 @@ export function grokView() {
     h(
       'div',
       { class: 'row' },
+      modeSeg(),
       h(
         'button',
         {

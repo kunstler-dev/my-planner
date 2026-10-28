@@ -726,6 +726,37 @@ textarea.input {
   }
 }
 
+/* ---- grok.com webview (subscription mode) ---- */
+.page-wide {
+  max-width: none;
+}
+.grok-web {
+  height: calc(100vh - 200px);
+  min-height: 420px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+#grok-web-host {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  border-radius: var(--radius);
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+#grok-web-host.visible {
+  visibility: visible;
+  pointer-events: auto;
+}
+#grok-web-host webview {
+  width: 100%;
+  height: 100%;
+  display: flex;
+}
+
 /* ---- pet corner ---- */
 .pet-corner {
   position: relative;
@@ -794,26 +825,6 @@ textarea.input {
   transform: translate(-50%, 0);
 }
 
-.wl {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 4px;
-}
-.wl i {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  border: 1.5px solid var(--ink);
-}
-.wl i.w {
-  background: var(--ink);
-}
-.avatar {
-  border-radius: 12px;
-  filter: grayscale(1);
-  border: 1px solid var(--line);
-}
 .post-text {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -827,23 +838,4 @@ textarea.input {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 1px 6px;
-}
-.game-col {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--soft);
-  text-align: left;
-  cursor: pointer;
-}
-.game-col:hover {
-  border-color: var(--ink);
-}
-.game-value {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
 }

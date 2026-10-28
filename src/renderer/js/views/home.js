@@ -7,7 +7,6 @@ import { totals, inMonth } from '../finance-calc.js';
 import { postList, windowStats, subscriberDelta } from '../tg.js';
 import { entryModal, entryRow } from './finance.js';
 import { askGrokAboutChannel, activeChannel } from './channel.js';
-import { dotaRank, winrate, pct } from '../games-calc.js';
 import { go } from '../app.js';
 
 function greeting() {
@@ -108,43 +107,6 @@ function tasksCard() {
   );
 }
 
-function gamesCard() {
-  const g = state.data.games;
-  const open = (tab) => () => {
-    update((d) => (d.games.tab = tab), { silent: true });
-    go('games');
-  };
-  const col = (tab, title, value, note) =>
-    h(
-      'button',
-      { class: 'game-col', onclick: open(tab) },
-      h('div', { class: 'stat-label' }, title),
-      h('div', { class: 'game-value' }, value),
-      h('div', { class: 'stat-note' }, note),
-    );
-  const dota = g.dota?.data;
-  const dl = g.deadlock?.data;
-  const cs = g.cs?.data;
-  const games30 = dota ? dota.wl30.win + dota.wl30.lose : 0;
-  return h(
-    'div',
-    { style: { marginTop: '16px' } },
-    card(
-      'Игры',
-      h('button', { class: 'btn ghost sm', onclick: () => go('games') }, g.steamId ? 'Открыть' : 'Подключить Steam', icon('right', 14)),
-      g.steamId
-        ? h(
-            'div',
-            { class: 'grid cols-3', style: { gap: '12px' } },
-            col('dota', 'Dota 2', dota ? dotaRank(dota.rankTier, dota.leaderboard) : '—', dota ? (games30 ? `винрейт за 30 дней ${pct(winrate(dota.wl30.win, games30))}` : 'за 30 дней игр нет') : 'нет данных'),
-            col('deadlock', 'Deadlock', dl ? dl.rank : '—', dl ? `винрейт ${pct(winrate(dl.total.wins, dl.total.matches))} · ${dl.total.matches} матчей` : 'нет данных'),
-            col('cs', 'CS2', cs?.premier ? cs.premier.toLocaleString('ru-RU') : '—', cs ? `Premier · винрейт ${pct(cs.winrate)}` : 'нет данных'),
-          )
-        : empty('Подключи профиль Steam — здесь будут ранги и винрейт в Dota 2, Deadlock и CS2.'),
-    ),
-  );
-}
-
 export function homeView() {
   const m = totals(inMonth(state.data.finance, thisMonth()));
   const channels = state.data.channels;
@@ -221,6 +183,5 @@ export function homeView() {
           : h('div', {}, empty('Подключи канал, чтобы видеть подписчиков и охваты.'), h('button', { class: 'btn', onclick: () => go('channel') }, 'Подключить')),
       ),
     ),
-    gamesCard(),
   );
 }

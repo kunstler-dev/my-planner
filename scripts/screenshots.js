@@ -1,5 +1,5 @@
 // Dev check: starts the app on a temp data folder with demo data, opens every section in light and dark
-// theme and saves screenshots. Usage: npx electron scripts/screenshots.js <outDir> [ch1,ch2] [steam profile]
+// theme and saves screenshots. Usage: npx electron scripts/screenshots.js <outDir> [ch1,ch2]
 const { app, BrowserWindow } = require('electron');
 const fs = require('fs');
 const os = require('os');
@@ -7,7 +7,6 @@ const path = require('path');
 
 const out = path.resolve(process.argv[2] || 'shots');
 const channels = (process.argv[3] || 'durov,telegram').split(',');
-const steam = process.argv[4] || 'https://steamcommunity.com/profiles/76561198034202275';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'planner-shots-'));
 process.env.PLANNER_DATA_DIR = dataDir;
 
@@ -87,23 +86,11 @@ app.on('browser-window-created', (_e, win) => {
         await until(`document.querySelectorAll('main .stat-value').length > 0 && !document.querySelector('main form input')`, 30000);
         log('channel added', ch);
       }
-      await click('Игры');
-      await wait(300);
-      await until(`!!document.querySelector('main form input')`);
-      await submitInput(steam);
-      await until(`document.querySelectorAll('main .stat-value').length > 0`, 30000);
-      log('steam linked');
       for (const theme of ['light', 'dark']) {
         if (theme === 'dark') await click('Тёмная тема');
         for (const [view, name] of [['Главная', 'home'], ['Финансы', 'finance'], ['Telegram-каналы', 'channel'], ['Grok', 'grok'], ['Настройки', 'settings']]) {
           await click(view);
           await shot(`${name}-${theme}`);
-        }
-        await click('Игры');
-        for (const tab of ['Dota 2', 'Deadlock', 'CS2']) {
-          await js(`[...document.querySelectorAll('main .seg button')].find(b => b.textContent === ${JSON.stringify(tab)}).click()`);
-          await until(`!document.querySelector('main').textContent.includes('Загружаю статистику')`, 30000);
-          await shot(`games-${tab.replace(' ', '').toLowerCase()}-${theme}`);
         }
       }
       await click('Финансы');

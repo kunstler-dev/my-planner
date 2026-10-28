@@ -1,5 +1,6 @@
-// Electron main process: window, data store, Grok streaming, Telegram page fetch, file export.
-const { app, BrowserWindow, ipcMain, dialog, nativeTheme, shell } = require('electron');
+// Electron main process: window, data store, Grok (API streaming and the grok.com webview), Telegram page
+// fetch, file export.
+const { app, BrowserWindow, ipcMain, dialog, nativeTheme, shell, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { createStore } = require('./store');
@@ -16,7 +17,60 @@ let win;
 let store;
 let secrets;
 const chats = new Map();
-const NET_HOSTS = ['api.opendota.com', 'api.deadlock-api.com', 'api-public.cs-prod.leetify.com', 'steamcommunity.com'];
+
+// grok.com with the user's own subscription: a sandboxed <webview> with its own persistent session.
+const GROK_PARTITION = 'persist:grok';
+const GROK_URL = 'https://grok.com/';
+const GROK_HOSTS = [/(^|\.)grok\.com$/, /(^|\.)x\.ai$/, /(^|\.)x\.com$/, /(^|\.)twitter\.com$/, /(^|\.)twimg\.com$/];
+const AUTH_HOSTS = [/^accounts\.google\.com$/, /(^|\.)googleusercontent\.com$/, /^appleid\.apple\.com$/, /(^|\.)cloudflare\.com$/];
+// A plain Chrome user agent: some sign-in pages refuse anything that says "Electron".
+const CHROME_UA = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
+
+function hostMatches(url, list) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && list.some((re) => re.test(u.hostname));
+  } catch {
+    return false;
+  }
+}
+const isGrokUrl = (url) => hostMatches(url, GROK_HOSTS);
+const isGrokOrAuthUrl = (url) => isGrokUrl(url) || hostMatches(url, AUTH_HOSTS);
+
+app.on('web-contents-created', (_e, contents) => {
+  // Only the grok.com webview may be attached, never with node access or a preload.
+  contents.on('will-attach-webview', (event, webPreferences, params) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    if (params.partition !== GROK_PARTITION || !isGrokUrl(params.src)) event.preventDefault();
+  });
+  if (contents.getType() !== 'webview') return;
+  contents.setWindowOpenHandler(({ url }) => {
+    // Sign-in popups (X / Google / Apple) open as small windows sharing the grok.com session.
+    if (isGrokOrAuthUrl(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 520,
+          height: 720,
+          parent: win,
+          autoHideMenuBar: true,
+          webPreferences: { partition: GROK_PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false },
+        },
+      };
+    }
+    if (/^https?:\/\//.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  contents.on('will-navigate', (event, url) => {
+    if (!isGrokOrAuthUrl(url)) {
+      event.preventDefault();
+      if (/^https?:\/\//.test(url)) shell.openExternal(url);
+    }
+  });
+});
 
 function createWindow() {
   const data = store.load();
@@ -35,6 +89,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   });
   win.loadFile(path.join(__dirname, '../renderer/index.html'));
@@ -57,6 +112,12 @@ app.whenReady().then(() => {
   const dir = app.getPath('userData');
   store = createStore(dir);
   secrets = createSecrets(dir);
+  session.fromPartition(GROK_PARTITION).setUserAgent(CHROME_UA);
+  ipcMain.handle('grokweb:logout', async () => {
+    await session.fromPartition(GROK_PARTITION).clearStorageData();
+    return true;
+  });
+  ipcMain.handle('grokweb:url', () => GROK_URL);
 
   ipcMain.handle('data:load', () => store.load());
   ipcMain.handle('data:save', (_e, data) => {
@@ -75,23 +136,6 @@ app.whenReady().then(() => {
     // BOM so Excel opens Cyrillic CSV correctly.
     fs.writeFileSync(filePath, '﻿' + content, 'utf8');
     return true;
-  });
-
-  // GET to the game stats APIs and Steam profile XML only; the page itself may not open connections (CSP).
-  ipcMain.handle('net:get', async (_e, url) => {
-    let host;
-    try {
-      host = new URL(url).hostname;
-    } catch {
-      return { ok: false, status: 0, error: 'bad_url' };
-    }
-    if (!NET_HOSTS.includes(host)) return { ok: false, status: 0, error: 'host_not_allowed' };
-    try {
-      const res = await fetch(url, { headers: { 'User-Agent': 'Planner/1.0 (desktop app)', Accept: 'application/json, text/xml' } });
-      return { ok: res.ok, status: res.status, text: await res.text() };
-    } catch (err) {
-      return { ok: false, status: 0, error: 'network', message: err.message };
-    }
   });
 
   // Public channel preview page t.me/s/<name>; parsed in the renderer.

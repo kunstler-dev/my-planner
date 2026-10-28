@@ -105,3 +105,23 @@ test('markdown escapes HTML', () => {
   assert.match(html, /<ul><li>a<\/li><li>b<\/li><\/ul>/);
   assert.match(html, /<pre><code>&lt;b&gt;<\/code><\/pre>/);
 });
+
+test('store migrates old data: one channel → channels, rubles → euro, games dropped', async () => {
+  const { createRequire } = await import('node:module');
+  const { normalize } = createRequire(import.meta.url)('../src/main/store.js');
+  const d = normalize({
+    settings: { currency: '₽', channel: 'mych' },
+    channel: { title: 'Мой', username: 'mych', snapshots: [{ date: '2026-10-01', subscribers: 5 }], posts: {}, fetchedAt: 1 },
+    games: { steamId: '1' },
+  });
+  assert.equal(d.settings.currency, '€');
+  assert.equal(d.settings.grokMode, 'web');
+  assert.deepEqual(
+    d.channels.map((c) => c.username),
+    ['mych'],
+  );
+  assert.equal(d.settings.activeChannel, 'mych');
+  assert.equal('channel' in d, false);
+  assert.equal('games' in d, false);
+  assert.equal(normalize({ settings: { currency: '₴', grokMode: 'api' } }).settings.grokMode, 'api');
+});
