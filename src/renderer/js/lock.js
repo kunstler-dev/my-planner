@@ -76,5 +76,5 @@ export function lockScreen() {
   };
   input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
   setTimeout(() => input.focus(), 50);
-  return h('div', { class: 'lock-screen' }, h('div', { class: 'lock-box' }, icon('stop', 28), h('h2', {}, t('lock.title')), input, msg));
+  return h('div', { class: 'lock-screen' }, h('div', { class: 'lock-box' }, icon('lock', 28), h('h2', {}, t('lock.title')), input, msg));
 }

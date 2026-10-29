@@ -32,6 +32,7 @@ export function svg(tag, attrs = {}, ...children) {
 
 // Lucide-style line icons (24px grid, stroke = currentColor).
 const ICONS = {
+  lock: 'M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM8 11V7a4 4 0 0 1 8 0v4',
   home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',
   wallet: 'M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3M21 8h-6a3 3 0 0 0 0 6h6z',
   send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z',

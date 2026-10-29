@@ -320,6 +320,16 @@ app.on('browser-window-created', (_e, win) => {
       await click('finance');
       await js(`document.querySelector('main .page-head .btn.primary').click()`);
       await shot('finance-modal');
+      await js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+      // Ctrl+K search and the lock screen (a demo PIN in the temporary data folder).
+      await click('home');
+      await js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))`);
+      await js(`(() => { const i = document.querySelector('.search-input'); i.value = 'siem'; i.dispatchEvent(new Event('input')); })()`);
+      await shot('search');
+      await js(`document.querySelector('.search-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+      await js(`window.api.pin.set('2468', null)`);
+      await js(`import('./js/lock.js').then((l) => (l.setPinState(true), l.lock()))`);
+      await shot('lock');
       fs.writeFileSync(path.join(out, 'errors.txt'), errors.join('\n'));
     } catch (err) {
       fs.writeFileSync(path.join(out, 'errors.txt'), `${errors.join('\n')}\n${err.stack}`);
