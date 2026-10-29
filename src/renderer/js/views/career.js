@@ -28,6 +28,8 @@ const LINKS = [
 /** Moving to «sent» stamps the date and sets a follow-up in a week. */
 function withStatus(app, status) {
   const out = { ...app, status };
+  // When the status last changed (replies and interviews in the weekly review).
+  if (status !== app.status) out.statusAt = today();
   if (status !== 'wish' && !out.sentAt) out.sentAt = today();
   if (status === 'sent' && !out.followUp) out.followUp = addDays(out.sentAt || today(), 7);
   if (status === 'offer' || status === 'rejected') out.followUp = '';

@@ -1914,3 +1914,14 @@ html.quick-mode body {
   border-color: var(--ink);
   color: var(--invert);
 }
+
+/* ---- stage 7 ---- */
+.nav-timer {
+  border: 1.5px solid var(--ink);
+}
+.nav-timer .nav-lang {
+  font-variant-numeric: tabular-nums;
+}
+.review-grok {
+  max-width: none;
+}

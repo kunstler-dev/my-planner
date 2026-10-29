@@ -9,6 +9,8 @@ import { projectStats } from '../planner-calc.js';
 import { CAT } from '../finance-calc.js';
 import { entryModal } from './finance.js';
 import { go } from '../app.js';
+import { toggleTimer } from '../timer.js';
+import { elapsedText } from '../productivity-calc.js';
 
 const STATUSES = ['idea', 'active', 'launched', 'paused'];
 const statuses = () => STATUSES.map((k) => [k, t(`project.status.${k}`)]);
@@ -73,12 +75,30 @@ function monetizePrompt(p, st) {
   });
 }
 
+/** ▶ / ■ with the running time; one timer at a time. */
+function timerButton(p) {
+  const tm = state.data.timer;
+  const running = tm?.projectId === p.id;
+  return h(
+    'button',
+    { class: `btn sm${running ? ' primary' : ''}`, title: running ? t('timer.stop') : t('timer.start'), onclick: () => toggleTimer(p.id) },
+    icon(running ? 'stop' : 'play', 13),
+    running ? h('span', { class: 'num', 'data-timer-start': tm.startedAt }, elapsedText(Date.now() - tm.startedAt)) : t('timer.startShort'),
+  );
+}
+
 function projectCard(p) {
   const st = projectStats(p, state.data.finance);
   const quick = h('input', { class: 'input', placeholder: t('project.milestonePh'), style: { flex: 1, height: '32px' } });
   return card(
     p.name,
-    h('div', { class: 'row' }, h('span', { class: `badge${p.status === 'launched' ? ' solid' : ''}` }, statusLabel(p.status)), h('button', { class: 'btn ghost sm icon-only', title: t('common.edit'), onclick: () => projectModal(p) }, icon('edit', 15))),
+    h(
+      'div',
+      { class: 'row' },
+      timerButton(p),
+      h('span', { class: `badge${p.status === 'launched' ? ' solid' : ''}` }, statusLabel(p.status)),
+      h('button', { class: 'btn ghost sm icon-only', title: t('common.edit'), onclick: () => projectModal(p) }, icon('edit', 15)),
+    ),
     p.description && h('p', { class: 'muted', style: { margin: '0 0 12px' } }, p.description),
     h(
       'div',

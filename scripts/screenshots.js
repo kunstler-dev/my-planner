@@ -113,6 +113,9 @@ function demoData() {
       fetchedAt: Date.now() - 40 * 60000,
       error: '',
     },
+    // A project timer running for 1 h 25 min.
+    timer: { projectId: 'pr1', startedAt: Date.now() - 85 * 60000 },
+    timerLast: 'pr1',
     rules: [{ id: 'ru1', field: 'desc', value: 'silpo', category: 'Еда', kind: 'expense', createdAt: day(5) }],
     // Letters (made up): a phone bill due soon, a receipt matching a bank operation, an invitation, a failed payment.
     bills: [{ id: 'b1', title: 'Vodafone', amount: 39.99, dueDate: day(-3), paid: false, ref: 'mail:demo-voda@example.test', category: 'Связь и подписки' }],
@@ -128,7 +131,7 @@ function demoData() {
     ],
     habits: [
       { id: 'h1', title: '30 минут немецкого', days: [day(0), day(1), day(2), day(3), day(5)] },
-      { id: 'h2', title: 'Один отклик в день', days: [day(1), day(2)] },
+      { id: 'h2', title: 'Один отклик в день', days: [day(1), day(2)], auto: { kind: 'apply' } },
     ],
     notes: [
       { id: 'n1', title: 'Вопросы на собеседование', text: 'Wie sieht ein typischer Tag aus?\nGibt es eine Übernahme nach der Ausbildung?', pinned: true, updatedAt: day(2) },
@@ -147,7 +150,7 @@ function demoData() {
       weeklyGoal: 5,
       applications: [
         { id: 'p1', company: 'Deutsche Bahn', position: 'Fachinformatiker Anwendungsentwicklung', kind: 'ausbildung', city: 'Berlin', status: 'sent', sentAt: day(9), followUp: day(2) },
-        { id: 'p2', company: 'Siemens', position: 'Fachinformatiker Systemintegration', kind: 'ausbildung', city: 'München', status: 'interview', sentAt: day(15) },
+        { id: 'p2', company: 'Siemens', position: 'Fachinformatiker Systemintegration', kind: 'ausbildung', city: 'München', status: 'interview', sentAt: day(15), statusAt: day(1) },
         { id: 'p3', company: 'REWE', position: 'Kaufmann im Einzelhandel', kind: 'ausbildung', city: 'Köln', status: 'wish' },
         { id: 'p4', company: 'Lidl', position: 'Werkstudent IT', kind: 'werkstudent', city: 'Berlin', status: 'sent', sentAt: day(1) },
         { id: 'p5', company: 'Zalando', position: 'Praktikum Frontend', kind: 'praktikum', city: 'Berlin', status: 'rejected', sentAt: day(25) },
@@ -245,6 +248,7 @@ app.on('browser-window-created', (_e, win) => {
           ['tasks'],
           ['notes'],
           ['games', ['ranks', 'clips', 'wishlist']],
+          ['review'],
           ['grok'],
           ['settings'],
         ];

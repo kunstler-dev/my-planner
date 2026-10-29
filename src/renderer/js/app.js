@@ -17,6 +17,10 @@ import { notesView } from './views/notes.js';
 import { gamesView } from './views/games.js';
 import { grokView } from './views/grok.js';
 import { settingsView } from './views/settings.js';
+import { reviewView } from './views/review.js';
+import { stopTimer, startTimer, syncTray, tickTimerDom } from './timer.js';
+import { autoHabitMarks, elapsedText } from './productivity-calc.js';
+import { today } from './dates.js';
 import { inboxView } from './views/inbox.js';
 import { newItems } from './inbox.js';
 import { startAccountSync } from './account-sync.js';
@@ -35,10 +39,11 @@ const VIEWS = {
   tasks: { icon: 'list', render: tasksView },
   notes: { icon: 'note', render: notesView },
   games: { icon: 'gamepad', render: gamesView },
+  review: { icon: 'chart', render: reviewView },
   grok: { icon: 'spark', render: grokView },
   settings: { icon: 'gear', render: settingsView },
 };
-const NAV = [['home'], ['money', 'finance', 'accounts', 'inbox'], ['work', 'career', 'projects', 'channel'], ['personal', 'tasks', 'notes', 'games'], ['assistant', 'grok']];
+const NAV = [['home'], ['money', 'finance', 'accounts', 'inbox'], ['work', 'career', 'projects', 'channel'], ['personal', 'tasks', 'notes', 'games', 'review'], ['assistant', 'grok']];
 
 export function go(view, opts) {
   state.view = view;
@@ -94,7 +99,18 @@ function renderNav() {
   const s = state.data.settings;
   const dark = s.theme === 'dark';
   const nextLang = LANGS[(LANGS.indexOf(s.lang) + 1) % LANGS.length];
+  const tm = state.data.timer;
+  const running = tm && state.data.projects.find((p) => p.id === tm.projectId);
   document.getElementById('nav-bottom').replaceChildren(
+    // The running project timer, always in sight.
+    running &&
+      h(
+        'button',
+        { class: 'nav-item nav-timer', title: running.name, onclick: () => go('projects') },
+        icon('clock'),
+        h('span', { class: 'nav-label' }, running.name),
+        h('span', { class: 'nav-lang', 'data-timer-start': tm.startedAt }, elapsedText(Date.now() - tm.startedAt)),
+      ),
     navItem('settings'),
     h(
       'button',
@@ -199,12 +215,25 @@ function checkRecurring() {
 function onCommand(msg) {
   if (msg?.cmd === 'go' && VIEWS[msg.view]) go(msg.view);
   else if (msg?.cmd === 'expense' || msg?.cmd === 'income') entryModal({ type: msg.cmd });
+  else if (msg?.cmd === 'timer-stop') stopTimer();
+  else if (msg?.cmd === 'timer-start' && state.data.timerLast) startTimer(state.data.timerLast);
   else if (msg?.cmd === 'add-entry' && msg.entry) {
     // From the quick entry window: saved here, the only window that writes data.
     const e = { id: uid(), ...msg.entry, category: msg.entry.category || CAT.other };
     update((d) => d.finance.push(e));
     toast(t(e.type === 'income' ? 'finance.incomeSaved' : 'finance.expenseSaved', { amount: money(e.amount) }));
   }
+}
+
+function applyAutoHabits() {
+  const marks = autoHabitMarks(state.data, today());
+  if (!marks.length) return;
+  update((d) => {
+    for (const m of marks) {
+      const hb = d.habits.find((x) => x.id === m.habitId);
+      if (hb && !hb.days.includes(m.date)) hb.days = [...hb.days, m.date].sort();
+    }
+  });
 }
 
 function render() {
@@ -227,6 +256,11 @@ async function boot() {
   window.api.onCommand(onCommand);
   onDayChange(checkRecurring);
   register('notify', MINUTE, () => checkNotifications());
+  // Habits with a rule check themselves; the tray shows the running timer.
+  register('habits-auto', 5 * MINUTE, applyAutoHabits);
+  register('timer-tray', MINUTE, syncTray);
+  onDayChange(applyAutoHabits);
+  setInterval(tickTimerDom, 15000);
   render();
   // Background tasks are registered before the first check, so they run right after start.
   await startAccountSync();
