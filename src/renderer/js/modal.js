@@ -2,7 +2,7 @@
 import { h, icon } from './ui.js';
 import { t } from './i18n.js';
 
-export function openModal(title, body, { onSubmit, submitText = t('common.save'), danger } = {}) {
+export function openModal(title, body, { onSubmit, submitText = t('common.save'), cancelText, danger, wide = false } = {}) {
   const close = () => {
     back.remove();
     document.removeEventListener('keydown', onKey);
@@ -13,7 +13,7 @@ export function openModal(title, body, { onSubmit, submitText = t('common.save')
   const form = h(
     'form',
     {
-      class: 'modal',
+      class: `modal${wide ? ' wide' : ''}`,
       onsubmit: (e) => {
         e.preventDefault();
         if (onSubmit?.() !== false) close();
@@ -26,7 +26,7 @@ export function openModal(title, body, { onSubmit, submitText = t('common.save')
       { class: 'row' },
       danger,
       h('div', { class: 'spacer' }),
-      h('button', { type: 'button', class: 'btn ghost', onclick: close }, t('common.cancel')),
+      h('button', { type: 'button', class: 'btn ghost', onclick: close }, cancelText || (onSubmit ? t('common.cancel') : t('common.close'))),
       onSubmit && h('button', { type: 'submit', class: 'btn primary' }, submitText),
     ),
   );

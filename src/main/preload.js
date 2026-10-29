@@ -22,6 +22,13 @@ contextBridge.exposeInMainWorld('api', {
     has: (name) => ipcRenderer.invoke('secret:has', name),
     set: (name, value) => ipcRenderer.invoke('secret:set', name, value),
   },
+  wallet: {
+    balances: (addresses) => ipcRenderer.invoke('wallet:balances', addresses),
+  },
+  mono: {
+    clientInfo: () => ipcRenderer.invoke('mono:clientInfo'),
+    statement: (account, from, to) => ipcRenderer.invoke('mono:statement', account, from, to),
+  },
   backups: {
     list: () => ipcRenderer.invoke('backups:list'),
     restore: (name) => ipcRenderer.invoke('backups:restore', name),

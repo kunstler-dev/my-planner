@@ -4,7 +4,7 @@ import { h, icon, money, uid, card, empty, toast } from '../ui.js';
 import { t } from '../i18n.js';
 import { formModal } from '../modal.js';
 import { barList } from '../charts.js';
-import { today, thisMonth, prettyDate, monthTitle } from '../dates.js';
+import { today, thisMonth, prettyDate, monthTitle, dateTime } from '../dates.js';
 import { inMonth, DEFAULT_CATEGORIES, CAT } from '../finance-calc.js';
 import { budgetStatus, firstOccurrence, upcoming, recurringMonthly, goalPlan, applyRecurring } from '../planner-calc.js';
 import { catLabel, catValue } from '../labels.js';
@@ -207,11 +207,15 @@ function goalModal(g) {
       { key: 'title', label: t('goal.what'), required: true, placeholder: t('goal.whatPh') },
       { key: 'target', label: t('common.amountCur', { cur: state.data.settings.currency }), type: 'number', required: true, half: true },
       { key: 'deadline', label: t('goal.deadline'), type: 'date', half: true },
+      ...(state.data.mono.jars.length
+        ? [{ key: 'jarId', label: t('goal.jar'), type: 'select', options: [['', t('goal.noJar')], ...state.data.mono.jars.map((j) => [j.id, j.title])] }]
+        : []),
     ],
-    { title: '', target: '', deadline: '', ...g },
+    { title: '', target: '', deadline: '', jarId: '', ...g },
     {
       onSave: (v) => {
         if (!(v.target > 0)) return false;
+        if (v.jarId === undefined) delete v.jarId;
         update((d) => {
           const i = d.goals.findIndex((x) => x.id === g?.id);
           if (i >= 0) d.goals[i] = { ...d.goals[i], ...v };
@@ -258,6 +262,7 @@ export function goalsTab() {
               h('div', { class: 'stat-value' }, `${money(p.saved)}`),
               h('div', { class: 'muted', style: { marginBottom: '10px' } }, `${t('common.ofAmount', { amount: money(g.target) })} · ${Math.round(p.share * 100)}%`),
               h('div', { class: 'bar-track', style: { height: '10px' } }, h('div', { class: 'bar-fill', style: { width: `${p.share * 100}%` } })),
+              g.jarId && h('div', { class: 'meta', style: { marginTop: '6px' } }, g.jarSync ? t('goal.fromMono', { time: dateTime(g.jarSync) }) : t('goal.fromMonoWait')),
               h(
                 'p',
                 { class: 'muted', style: { margin: '10px 0 0' } },

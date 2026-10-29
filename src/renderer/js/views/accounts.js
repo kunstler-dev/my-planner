@@ -1,19 +1,24 @@
-// Accounts: where the money is (Trust Wallet, Ukrainian card, German card, …). Balances are typed in by hand,
-// each update is kept as a history point; totals are converted with NBU rates (or rates typed by hand).
+// Accounts: where the money is (Trust Wallet, Ukrainian card, German card, …). A balance is typed in by hand or
+// updated automatically (Trust Wallet public addresses, Monobank); each update is a history point. Totals are
+// converted with NBU rates (or rates typed by hand). «Balance» stays as a manual correction for any account.
 import { state, update } from '../state.js';
 import { h, icon, money, uid, card, empty, toast } from '../ui.js';
 import { t, locale } from '../i18n.js';
-import { formModal } from '../modal.js';
+import { openModal, formModal } from '../modal.js';
 import { lineChart, barList } from '../charts.js';
 import { today, prettyDate } from '../dates.js';
 import { netWorth, convert, setBalance, ratesFromNbu } from '../planner-calc.js';
 import { accountName, accountNameValue, rateSource as sourceKey } from '../labels.js';
+import { CURRENCY } from '../mono-import.js';
+import { syncAccount, isSyncing } from '../account-sync.js';
+import { validAddress, looksLikeSeed } from '../wallet-check.js';
 
 const curs = () => [
   ['€', t('cur.eur')],
   ['₴', t('cur.uah')],
   ['$', t('cur.usd')],
 ];
+const NETWORKS = ['tron', 'bsc', 'eth'];
 
 export function fmt(amount, cur) {
   const v = Math.round((Number(amount) || 0) * 100) / 100;
@@ -49,24 +54,159 @@ function balanceModal(a) {
   );
 }
 
+const time = (ms) => new Date(ms).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+const syncError = (code) => t(`sync.error.${['partial', 'no_token', 'bad_token', 'rate', 'network', 'no_addresses'].includes(code) ? code : 'http'}`);
+
+/** «auto, updated at 14:05», the error, or the manual «updated on …». */
+function syncNote(a) {
+  const kind = a.sync?.kind;
+  if (kind === 'trust' || kind === 'mono') {
+    if (isSyncing(kind === 'mono' ? 'mono' : `trust:${a.id}`)) return t('sync.running');
+    if (a.sync.error && a.sync.error !== 'partial') return `⚠ ${syncError(a.sync.error)}`;
+    const note = a.sync.lastSync ? t('sync.autoAt', { time: time(a.sync.lastSync) }) : t('sync.autoNever');
+    return a.sync.error === 'partial' ? `${note} · ${syncError('partial')}` : note;
+  }
+  return a.updatedAt ? t('accounts.updated', { date: prettyDate(a.updatedAt) }) : t('accounts.notEntered');
+}
+
+/** Trust Wallet: what makes up the balance, by coin and network. */
+function breakdownModal(a) {
+  const lines = (a.sync?.breakdown || []).filter((l) => l.amount > 0 || l.usd > 0);
+  openModal(
+    t('wallet.breakdown', { name: accountName(a) }),
+    lines.length
+      ? h(
+          'div',
+          { class: 'list' },
+          lines.map((l) =>
+            h(
+              'div',
+              { class: 'list-row compact' },
+              h('div', { class: 'grow' }, h('div', { class: 'title' }, `${l.symbol} · ${t(`wallet.net.${l.network}`)}`), h('div', { class: 'meta' }, `${l.address.slice(0, 6)}…${l.address.slice(-4)}`)),
+              h('div', { style: { textAlign: 'right' } }, h('div', { class: 'amount' }, `${l.amount.toLocaleString(locale(), { maximumFractionDigits: l.symbol === 'USDT' ? 2 : 6 })} ${l.symbol}`), h('div', { class: 'meta' }, fmt(l.usd, '$'))),
+            ),
+          ),
+        )
+      : empty(t('wallet.breakdownEmpty')),
+  );
+}
+
+/** The editable list of public addresses in the account dialog. */
+function addressEditor(list) {
+  const box = h('div', { class: 'stack', style: { gap: '8px' } });
+  const render = () => {
+    const net = h('select', { class: 'input', style: { width: '170px' } }, NETWORKS.map((n) => h('option', { value: n }, t(`wallet.net.${n}`))));
+    const input = h('input', { class: 'input', placeholder: t('wallet.addressPh'), style: { flex: 1 } });
+    const add = () => {
+      const v = input.value.trim();
+      if (!v) return;
+      if (looksLikeSeed(v)) {
+        input.value = '';
+        return toast(t('wallet.seedRejected'));
+      }
+      if (!validAddress(net.value, v)) return toast(t(`wallet.badAddress.${net.value}`));
+      if (list.some((x) => x.address === v && x.network === net.value)) return;
+      list.push({ network: net.value, address: v });
+      render();
+    };
+    input.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), add()));
+    box.replaceChildren(
+      h('div', { class: 'seed-warning' }, icon('alert', 18), t('wallet.seedWarning')),
+      ...list.map((x, i) =>
+        h(
+          'div',
+          { class: 'list-row compact' },
+          h('span', { class: 'badge' }, t(`wallet.net.${x.network}`)),
+          h('div', { class: 'grow title', style: { fontFamily: 'var(--mono)', fontSize: '12.5px' } }, x.address),
+          h('button', { type: 'button', class: 'btn ghost sm icon-only', title: t('common.delete'), onclick: () => (list.splice(i, 1), render()) }, icon('trash', 14)),
+        ),
+      ),
+      h('div', { class: 'row' }, net, input, h('button', { type: 'button', class: 'btn', onclick: add }, icon('plus', 14), t('common.add'))),
+    );
+  };
+  render();
+  return box;
+}
+
+/** Which Monobank cards make up this account. */
+function monoPicker(selected) {
+  const accounts = state.data.mono.accounts.filter((m) => CURRENCY[m.currencyCode]);
+  if (!accounts.length) return h('p', { class: 'muted', style: { margin: 0 } }, t('mono.noAccounts'));
+  return h(
+    'div',
+    { class: 'stack', style: { gap: '6px' } },
+    accounts.map((m) =>
+      h(
+        'label',
+        { class: 'row', style: { gap: '8px' } },
+        h('input', { type: 'checkbox', checked: selected.includes(m.id), onchange: (e) => (e.target.checked ? selected.push(m.id) : selected.splice(selected.indexOf(m.id), 1)) }),
+        monoLabel(m),
+      ),
+    ),
+  );
+}
+
+export const monoLabel = (m) => `${t(`mono.type.${['black', 'white', 'platinum', 'iron', 'fop', 'yellow', 'eAid'].includes(m.type) ? m.type : 'other'}`)}${m.pan ? ` ·· ${m.pan}` : ''} · ${fmt(m.balance / 100, CURRENCY[m.currencyCode])}`;
+
 function accountModal(a) {
   const isNew = !a;
-  formModal(
+  const draft = { name: a ? accountName(a) : '', currency: a?.currency || '€', kind: a?.sync?.kind || 'manual' };
+  const addresses = [...(a?.sync?.addresses || [])];
+  const monoIds = [...(a?.sync?.monoIds || [])];
+  const name = h('input', { class: 'input', value: draft.name, placeholder: t('accounts.namePh'), required: true });
+  const currency = h('select', { class: 'input' }, curs().map(([v, l]) => h('option', { value: v, selected: v === draft.currency ? 'selected' : null }, l)));
+  const balance = h('input', { class: 'input', type: 'number', step: 'any' });
+  const sourceBox = h('div');
+  const seg = h('div', { class: 'seg' });
+  const renderSource = () => {
+    seg.replaceChildren(...['manual', 'trust', 'mono'].map((k) => h('button', { type: 'button', class: draft.kind === k ? 'on' : '', onclick: () => ((draft.kind = k), renderSource()) }, t(`sync.kind.${k}`))));
+    sourceBox.replaceChildren(draft.kind === 'trust' ? addressEditor(addresses) : draft.kind === 'mono' ? monoPicker(monoIds) : isNew ? h('label', { class: 'field' }, t('accounts.balanceStart'), balance) : '');
+  };
+  renderSource();
+  const modal = openModal(
     isNew ? t('accounts.new') : accountName(a),
-    [
-      { key: 'name', label: t('common.name'), required: true, placeholder: t('accounts.namePh') },
-      { key: 'currency', label: t('common.currency'), type: 'select', options: curs() },
-      ...(isNew ? [{ key: 'balance', label: t('accounts.balanceStart'), type: 'number' }] : []),
-    ],
-    { name: '', currency: '€', balance: '', ...a, ...(a ? { name: accountName(a) } : {}) },
+    h(
+      'div',
+      { class: 'stack', style: { gap: '12px' } },
+      h('div', { class: 'grid cols-2', style: { gap: '12px' } }, h('label', { class: 'field' }, t('common.name'), name), h('label', { class: 'field' }, t('common.currency'), currency)),
+      h('label', { class: 'field' }, t('sync.source'), seg),
+      sourceBox,
+    ),
     {
-      onSave: (v) => {
+      wide: true,
+      onSubmit: () => {
+        if (!name.value.trim()) return name.focus(), false;
+        if (draft.kind === 'trust' && !addresses.length) return toast(t('wallet.needAddress')), false;
+        if (draft.kind === 'mono' && !monoIds.length) return toast(t('mono.needCard')), false;
+        const sync = draft.kind === 'manual' ? { kind: 'manual' } : { ...(a?.sync || {}), kind: draft.kind, addresses: draft.kind === 'trust' ? addresses : undefined, monoIds: draft.kind === 'mono' ? monoIds : undefined, error: '' };
+        let saved;
         update((d) => {
-          if (isNew) d.accounts.push(setBalance({ id: uid(), name: v.name, currency: v.currency, history: [] }, v.balance || 0, today()));
-          else Object.assign(d.accounts.find((x) => x.id === a.id), { name: accountNameValue(a, v.name), currency: v.currency });
+          if (isNew) {
+            saved = { ...setBalance({ id: uid(), name: name.value.trim(), currency: currency.value, history: [] }, Number(balance.value) || 0, today()), sync };
+            d.accounts.push(saved);
+          } else {
+            const x = d.accounts.find((y) => y.id === a.id);
+            Object.assign(x, { name: accountNameValue(a, name.value.trim()), currency: currency.value, sync });
+            saved = x;
+          }
         });
+        if (draft.kind !== 'manual') syncAccount(saved);
       },
-      onDelete: isNew ? null : () => update((d) => (d.accounts = d.accounts.filter((x) => x.id !== a.id))),
+      danger:
+        !isNew &&
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'btn ghost',
+            onclick: () => {
+              update((d) => (d.accounts = d.accounts.filter((x) => x.id !== a.id)));
+              modal.close();
+            },
+          },
+          icon('trash', 16),
+          t('common.delete'),
+        ),
     },
   );
 }
@@ -101,6 +241,8 @@ function historySeries(accounts, rates, main) {
   });
 }
 
+const isAuto = (a) => a.sync?.kind === 'trust' || a.sync?.kind === 'mono';
+
 export function accountsView() {
   const { accounts, rates, settings } = state.data;
   const main = settings.currency;
@@ -130,10 +272,10 @@ export function accountsView() {
       accounts.slice(0, 3).map((a) =>
         h(
           'button',
-          { class: 'card stat', style: { textAlign: 'left', cursor: 'pointer' }, title: t('accounts.updateBalance'), onclick: () => balanceModal(a) },
+          { class: 'card stat', style: { textAlign: 'left', cursor: 'pointer' }, title: a.sync?.kind === 'trust' ? t('wallet.breakdownHint') : t('accounts.updateBalance'), onclick: () => (a.sync?.kind === 'trust' ? breakdownModal(a) : balanceModal(a)) },
           h('div', { class: 'stat-label' }, accountName(a)),
           h('div', { class: 'stat-value' }, fmt(a.balance, a.currency)),
-          h('div', { class: 'stat-note' }, a.currency === main ? (a.updatedAt ? t('accounts.updated', { date: prettyDate(a.updatedAt) }) : t('accounts.clickToEnter')) : `≈ ${money(convert(a.balance, a.currency, main, rates))}`),
+          h('div', { class: 'stat-note' }, isAuto(a) ? syncNote(a) : a.currency === main ? (a.updatedAt ? t('accounts.updated', { date: prettyDate(a.updatedAt) }) : t('accounts.clickToEnter')) : `≈ ${money(convert(a.balance, a.currency, main, rates))}`),
         ),
       ),
     ),
@@ -154,9 +296,20 @@ export function accountsView() {
                   h(
                     'div',
                     { class: 'list-row' },
-                    h('div', { class: 'grow' }, h('div', { class: 'title' }, accountName(a)), h('div', { class: 'meta' }, a.updatedAt ? t('accounts.updated', { date: prettyDate(a.updatedAt) }) : t('accounts.notEntered'))),
-                    h('div', { style: { textAlign: 'right' } }, h('div', { class: 'amount' }, fmt(a.balance, a.currency)), a.currency !== main && h('div', { class: 'meta' }, `≈ ${money(convert(a.balance, a.currency, main, rates))}`)),
-                    h('button', { class: 'btn sm', onclick: () => balanceModal(a) }, t('accounts.balance')),
+                    h(
+                      'div',
+                      { class: 'grow' },
+                      h('div', { class: 'title' }, accountName(a), isAuto(a) && h('span', { class: 'badge', style: { marginLeft: '8px' } }, t(`sync.kind.${a.sync.kind}`))),
+                      h('div', { class: `meta${a.sync?.error && a.sync.error !== 'partial' ? ' sync-error' : ''}` }, syncNote(a)),
+                    ),
+                    h(
+                      'div',
+                      { style: { textAlign: 'right', cursor: a.sync?.kind === 'trust' ? 'pointer' : null }, title: a.sync?.kind === 'trust' ? t('wallet.breakdownHint') : null, onclick: a.sync?.kind === 'trust' ? () => breakdownModal(a) : null },
+                      h('div', { class: 'amount' }, fmt(a.balance, a.currency)),
+                      a.currency !== main && h('div', { class: 'meta' }, `≈ ${money(convert(a.balance, a.currency, main, rates))}`),
+                    ),
+                    isAuto(a) && h('button', { class: 'btn ghost sm icon-only', title: t('common.update'), disabled: isSyncing(a.sync.kind === 'mono' ? 'mono' : `trust:${a.id}`), onclick: () => syncAccount(a) }, icon('refresh', 15)),
+                    h('button', { class: 'btn sm', title: isAuto(a) ? t('sync.manualFix') : null, onclick: () => balanceModal(a) }, t('accounts.balance')),
                     h('button', { class: 'btn ghost sm icon-only', title: t('common.edit'), onclick: () => accountModal(a) }, icon('edit', 15)),
                   ),
                 ),

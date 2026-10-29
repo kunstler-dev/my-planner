@@ -14,6 +14,7 @@ import { go } from '../app.js';
 import { netWorth, upcoming, careerStats, budgetStatus } from '../planner-calc.js';
 import { catLabel, accountName } from '../labels.js';
 import { layoutOrder, moveCard, toggleHidden, toColumns } from '../home-layout.js';
+import { newItems } from '../inbox.js';
 import { gamesCard } from './games.js';
 import { habitRow } from './tasks.js';
 
@@ -131,7 +132,7 @@ export function registerHomeCard(def) {
 
 const hasChannel = () => state.data.channels.length > 0;
 // Default order; the three columns are filled row by row, so this gives tasks + habits | operations + payments | games + channel.
-const DEFAULT_ORDER = ['money', 'month', 'subscribers', 'career', 'tasks', 'recent', 'games', 'habits', 'upcoming', 'channel'];
+const DEFAULT_ORDER = ['money', 'month', 'inbox', 'subscribers', 'career', 'tasks', 'recent', 'games', 'habits', 'upcoming', 'channel'];
 const knownIds = () => [...DEFAULT_ORDER.filter((id) => CARDS.some((c) => c.id === id)), ...CARDS.map((c) => c.id).filter((id) => !DEFAULT_ORDER.includes(id))];
 
 registerHomeCard({
@@ -175,6 +176,12 @@ registerHomeCard({
     const cs = careerStats(state.data.career.applications, today());
     return tile(t('home.appsWeek'), 'briefcase', `${cs.week} / ${state.data.career.weeklyGoal}`, cs.followUps.length ? t('home.followUps', { n: cs.followUps.length }) : t('home.sentTotal', { n: cs.sent }), () => go('career'));
   },
+});
+registerHomeCard({
+  id: 'inbox',
+  tile: true,
+  available: () => newItems(state.data.inbox).length > 0,
+  render: () => tile(t('nav.inbox'), 'inbox', String(newItems(state.data.inbox).length), t('home.inboxNote'), () => go('inbox')),
 });
 registerHomeCard({ id: 'tasks', render: tasksCard });
 registerHomeCard({
