@@ -102,6 +102,9 @@ export function dueNotifications(data, now = new Date()) {
       out.push({ id: `steam:${g.id}:${g.price}`, once: true, type: 'steam', view: 'games', key, params: { name: g.name, price: `${g.price} ${g.currency || '₴'}`, after: fit?.after, short: fit?.short } });
     }
   }
+  if (s.jobs !== false && data.jobs?.found?.n > 0 && data.jobs.found.date === today) {
+    out.push({ id: `jobs:${today}`, once: true, type: 'jobs', view: 'career', key: 'notify.jobs', params: { n: data.jobs.found.n } });
+  }
   if (s.habits !== false && (data.habits || []).length) {
     const at = toMinutes(s.habitsAt) ?? 20 * 60;
     const open = data.habits.filter((hb) => !(hb.days || []).includes(today));
