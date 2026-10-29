@@ -105,6 +105,13 @@ export function dueNotifications(data, now = new Date()) {
   if (s.jobs !== false && data.jobs?.found?.n > 0 && data.jobs.found.date === today) {
     out.push({ id: `jobs:${today}`, once: true, type: 'jobs', view: 'career', key: 'notify.jobs', params: { n: data.jobs.found.n } });
   }
+  if (s.timer !== false && data.timer && now.getTime() - data.timer.startedAt > 4 * 3600000) {
+    const p = (data.projects || []).find((x) => x.id === data.timer.projectId);
+    out.push({ id: `timer:${data.timer.startedAt}`, once: true, type: 'timer', view: 'projects', key: 'notify.timer', params: { name: p?.name || '' } });
+  }
+  if (s.review !== false && now.getDay() === 0 && now.getHours() * 60 + now.getMinutes() >= (toMinutes(data.settings.reviewAt) ?? 19 * 60)) {
+    out.push({ id: `review:${today}`, once: true, type: 'review', view: 'review', key: 'notify.review', params: {} });
+  }
   if (s.habits !== false && (data.habits || []).length) {
     const at = toMinutes(s.habitsAt) ?? 20 * 60;
     const open = data.habits.filter((hb) => !(hb.days || []).includes(today));

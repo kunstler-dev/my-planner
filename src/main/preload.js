@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   openDataDir: () => ipcRenderer.invoke('app:openDataDir'),
   setStrings: (dict) => ipcRenderer.invoke('app:strings', dict),
   notify: (msg) => ipcRenderer.invoke('app:notify', msg),
+  setTimer: (info) => ipcRenderer.invoke('app:timer', info),
   /** Tray menu and notification clicks: { cmd: 'go', view } | { cmd: 'expense' } | { cmd: 'income' }. */
   onCommand: (fn) => {
     commandListeners.add(fn);

@@ -24,7 +24,7 @@ function defaultDocs() {
 
 // Notification types are switched on by default; quiet hours 23:00–08:00.
 function defaultNotify() {
-  return { recurring: true, budget: true, followUp: true, habits: true, bills: true, alerts: true, contracts: true, steam: true, jobs: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
+  return { recurring: true, budget: true, followUp: true, habits: true, bills: true, alerts: true, contracts: true, steam: true, jobs: true, timer: true, review: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
 }
 
 function defaultData() {
@@ -56,6 +56,8 @@ function defaultData() {
       // Steam profile (SteamID64) for OpenDota and the wishlist import; daily wishlist sync is optional.
       steamId: '',
       steamWishlistSync: false,
+      // When the weekly review notification comes on Sundays.
+      reviewAt: '19:00',
     },
     // Units of each currency per 1 €; refreshed from the NBU or typed by hand.
     rates: { '€': 1, '₴': 48, $: 1.08, updatedAt: '' },
@@ -93,6 +95,11 @@ function defaultData() {
     // Saved job searches, «not interested» refnr and the last daily check.
     jobs: defaultJobs(),
     // OpenDota cache: profile and rank, win/loss for 30 days, last 20 matches, hero names.
+    // Project timer { projectId, startedAt } (survives a restart) and the project it ran last.
+    timer: null,
+    timerLast: '',
+    // Saved weekly reviews { week: Monday, summary, grok }, the newest 52.
+    weeklyReviews: [],
     dota: { profile: null, wl: null, matches: [], heroes: {}, fetchedAt: 0, error: '' },
   };
 }
@@ -171,6 +178,9 @@ function normalize(raw) {
     inbox: arr(raw.inbox),
     mailRules: arr(raw.mailRules),
     bills: arr(raw.bills),
+    timer: raw.timer && typeof raw.timer === 'object' && raw.timer.projectId && Number(raw.timer.startedAt) > 0 ? { projectId: String(raw.timer.projectId), startedAt: Number(raw.timer.startedAt) } : null,
+    timerLast: typeof raw.timerLast === 'string' ? raw.timerLast : '',
+    weeklyReviews: arr(raw.weeklyReviews).slice(-52),
     dota: { profile: null, wl: null, matches: [], heroes: {}, fetchedAt: 0, error: '', ...obj(raw.dota), matches: arr(raw.dota?.matches), heroes: obj(raw.dota?.heroes) },
     jobs: { ...defaultJobs(), ...obj(raw.jobs), searches: arr(raw.jobs?.searches), ignored: arr(raw.jobs?.ignored) },
     mono: { ...defaultMono(), ...obj(raw.mono), accounts: arr(raw.mono?.accounts), jars: arr(raw.mono?.jars), last: obj(raw.mono?.last) },

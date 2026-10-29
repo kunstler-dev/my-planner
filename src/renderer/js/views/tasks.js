@@ -6,6 +6,8 @@ import { formModal } from '../modal.js';
 import { today, prettyDate, addDays } from '../dates.js';
 import { habitStreak } from '../planner-calc.js';
 import { taskRow } from './home.js';
+import { categories } from './finance.js';
+import { catLabel } from '../labels.js';
 
 function addTaskForm() {
   const title = h('input', { class: 'input', placeholder: t('tasks.newPh'), style: { flex: 1 } });
@@ -27,18 +29,31 @@ function addTaskForm() {
   );
 }
 
+const RULES = ['', 'apply', 'spend', 'noSpend', 'tasks', 'project'];
+
 function habitModal(hb) {
   const isNew = !hb;
+  const a = hb?.auto || {};
   formModal(
     isNew ? t('tasks.newHabit') : hb.title,
-    [{ key: 'title', label: t('tasks.habit'), required: true, placeholder: t('tasks.habitPh') }],
-    { title: '', ...hb },
+    [
+      { key: 'title', label: t('tasks.habit'), required: true, placeholder: t('tasks.habitPh') },
+      // Optional rule: the habit checks itself; checking by hand still works.
+      { key: 'kind', label: t('habit.auto'), type: 'select', options: RULES.map((k) => [k, t(`habit.rule.${k || 'none'}`)]) },
+      { key: 'category', label: t('habit.category'), type: 'select', options: categories('expense').map((c) => [c, catLabel(c)]), half: true },
+      { key: 'n', label: t('habit.tasksN'), type: 'number', half: true },
+      { key: 'minutes', label: t('habit.minutes'), type: 'number', half: true },
+      { key: 'projectId', label: t('habit.project'), type: 'select', options: [['', t('habit.anyProject')], ...state.data.projects.map((p) => [p.id, p.name])], half: true },
+    ],
+    { title: '', kind: a.kind || '', category: a.category || categories('expense')[0], n: a.n || 3, minutes: a.minutes || 60, projectId: a.projectId || '', ...hb },
     {
-      onSave: (v) =>
+      onSave: (v) => {
+        const auto = v.kind ? { kind: v.kind, ...(v.kind === 'noSpend' ? { category: v.category } : {}), ...(v.kind === 'tasks' ? { n: Math.max(1, Math.round(v.n || 1)) } : {}), ...(v.kind === 'project' ? { minutes: Math.max(1, Math.round(v.minutes || 1)), projectId: v.projectId || '' } : {}) } : undefined;
         update((d) => {
-          if (isNew) d.habits.push({ id: uid(), title: v.title, days: [] });
-          else d.habits.find((x) => x.id === hb.id).title = v.title;
-        }),
+          if (isNew) d.habits.push({ id: uid(), title: v.title, days: [], auto, createdAt: today() });
+          else Object.assign(d.habits.find((x) => x.id === hb.id), { title: v.title, auto });
+        });
+      },
       onDelete: isNew ? null : () => update((d) => (d.habits = d.habits.filter((x) => x.id !== hb.id))),
     },
   );
@@ -47,7 +62,10 @@ function habitModal(hb) {
 function toggleHabit(id, date) {
   update((d) => {
     const hb = d.habits.find((x) => x.id === id);
-    hb.days = hb.days.includes(date) ? hb.days.filter((x) => x !== date) : [...hb.days, date].sort();
+    const off = hb.days.includes(date);
+    hb.days = off ? hb.days.filter((x) => x !== date) : [...hb.days, date].sort();
+    // Unchecked by hand: the rule leaves that day alone from now on.
+    if (hb.auto) hb.autoOff = off ? [...new Set([...(hb.autoOff || []), date])].slice(-60) : (hb.autoOff || []).filter((x) => x !== date);
   });
 }
 
@@ -63,7 +81,7 @@ export function habitRow(hb, { compact = false } = {}) {
     h(
       'div',
       { class: 'grow', style: { cursor: compact ? 'default' : 'pointer' }, onclick: compact ? null : () => habitModal(hb) },
-      h('div', { class: 'title' }, hb.title),
+      h('div', { class: 'title' }, hb.title, hb.auto?.kind && h('span', { class: 'badge', style: { marginLeft: '6px' }, title: t(`habit.rule.${hb.auto.kind}`) }, t('habit.autoBadge'))),
       h('div', { class: 'meta' }, streak ? t('tasks.streak', { n: streak }) : t('tasks.streakStart')),
     ),
     h(

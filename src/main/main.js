@@ -33,6 +33,8 @@ const STEAM_CC = 'ua';
 let win;
 let quickWin = null;
 let quickKey = null;
+// The project timer as the page reports it: { title, elapsed } while running, { lastTitle } when stopped.
+let timer = null;
 let tray = null;
 let store;
 let secrets;
@@ -205,6 +207,11 @@ function buildTray() {
     { label: str('main.tray.open', 'Planner'), click: showWindow },
     { type: 'separator' },
     { label: str('main.tray.quick', 'Quick'), click: openQuick },
+    ...(timer?.title
+      ? [{ label: `${str('main.tray.timerStop', 'Stop')}: ${timer.title} (${timer.elapsed})`, click: () => command({ cmd: 'timer-stop' }) }]
+      : timer?.lastTitle
+        ? [{ label: `${str('main.tray.timerStart', 'Start')}: ${timer.lastTitle}`, click: () => command({ cmd: 'timer-start' }) }]
+        : []),
     { label: str('main.tray.expense', '+'), click: () => command({ cmd: 'expense' }) },
     { label: str('main.tray.income', '+'), click: () => command({ cmd: 'income' }) },
     { type: 'separator' },
@@ -220,7 +227,7 @@ function buildTray() {
     tray = new Tray(path.join(__dirname, '../renderer/assets/icon.png'));
     tray.on('click', showWindow);
   }
-  tray.setToolTip('Planner');
+  tray.setToolTip(timer?.title ? `Planner · ${timer.title} ${timer.elapsed}` : 'Planner');
   tray.setContextMenu(menu);
 }
 
@@ -388,6 +395,12 @@ app.whenReady().then(() => {
     const clean = { type, amount: Math.round(amount * 100) / 100, date, category: String(entry?.category || '').slice(0, 60), note: String(entry?.note || '').slice(0, 200) };
     win?.webContents.send('app:command', { cmd: 'add-entry', entry: clean });
     quickWin?.hide();
+    return true;
+  });
+  ipcMain.handle('app:timer', (_e, info) => {
+    const s = (v) => String(v ?? '').slice(0, 80);
+    timer = info && typeof info === 'object' ? { title: info.title ? s(info.title) : '', elapsed: s(info.elapsed), lastTitle: info.lastTitle ? s(info.lastTitle) : '' } : null;
+    if (tray) buildTray();
     return true;
   });
   ipcMain.handle('quick:close', () => quickWin?.hide());
