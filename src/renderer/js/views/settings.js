@@ -1,11 +1,15 @@
-// Settings: Grok key and model, currency, theme, pets, data folder.
+// Settings: language, Grok key and model, appearance, tray and autostart, notifications, data folder and backups.
 import { state, update } from '../state.js';
-import { h, card, toast } from '../ui.js';
-import { setTheme, applyMedia } from '../app.js';
+import { h, card, toast, icon } from '../ui.js';
+import { t, LANGS, num } from '../i18n.js';
+import { setTheme, setLanguage, applyMedia } from '../app.js';
+import { dateTime, prettyDate } from '../dates.js';
 import { resetGrokKeyCache } from './grok.js';
 
 let models = null;
 let keySet = null;
+let backups = null;
+let backupsAt = 0;
 
 function seg(options, value, onPick) {
   return h(
@@ -15,13 +19,23 @@ function seg(options, value, onPick) {
   );
 }
 
+const onOff = (value, onPick) =>
+  seg(
+    [
+      [true, t('common.on')],
+      [false, t('common.off')],
+    ],
+    !!value,
+    onPick,
+  );
+
 /** Choose / remove a background or banner file (copied into the data folder, never uploaded anywhere). */
 function mediaRow(kind, title, note) {
   const s = state.data.settings;
   const current = s[kind];
   return settingRow(
     title,
-    current ? `${note}. Сейчас: свой файл` : note,
+    current ? `${note}. ${t('settings.ownFile')}` : note,
     h(
       'div',
       { class: 'row' },
@@ -33,10 +47,10 @@ function mediaRow(kind, title, note) {
             const name = await window.api.media.choose(kind);
             if (!name) return;
             update((d) => (d.settings[kind] = name));
-            toast(kind === 'banner' ? 'Баннер обновлён' : 'Фон обновлён');
+            toast(kind === 'banner' ? t('settings.bannerUpdated') : t('settings.bgUpdated'));
           },
         },
-        current ? 'Заменить' : 'Выбрать файл',
+        current ? t('settings.replace') : t('settings.chooseFile'),
       ),
       current &&
         h(
@@ -48,18 +62,88 @@ function mediaRow(kind, title, note) {
               update((d) => (d.settings[kind] = ''));
             },
           },
-          'Убрать',
+          t('settings.remove'),
         ),
     ),
   );
 }
 
 function settingRow(title, note, control) {
-  return h(
-    'div',
-    { class: 'list-row', style: { padding: '14px 4px' } },
-    h('div', { class: 'grow' }, h('div', { style: { fontWeight: 600 } }, title), note && h('div', { class: 'meta' }, note)),
-    control,
+  return h('div', { class: 'list-row setting-row' }, h('div', { class: 'grow' }, h('div', { style: { fontWeight: 600 } }, title), note && h('div', { class: 'meta' }, note)), control);
+}
+
+function timeInput(value, onChange) {
+  return h('input', { class: 'input', type: 'time', value, style: { width: '110px' }, onchange: (e) => e.target.value && onChange(e.target.value) });
+}
+
+const setNotify = (key, value) => update((d) => (d.settings.notify[key] = value));
+
+function notificationsCard() {
+  const n = state.data.settings.notify;
+  const type = (key) => settingRow(t(`settings.notify.${key}`), t(`settings.notify.${key}Hint`), onOff(n[key], (v) => setNotify(key, v)));
+  return card(
+    t('settings.notifications'),
+    null,
+    h(
+      'div',
+      { class: 'list' },
+      type('recurring'),
+      type('budget'),
+      type('followUp'),
+      type('habits'),
+      n.habits && settingRow(t('settings.notify.habitsAt'), null, timeInput(n.habitsAt, (v) => setNotify('habitsAt', v))),
+      settingRow(
+        t('settings.quietHours'),
+        t('settings.quietHint'),
+        h('div', { class: 'row' }, timeInput(n.quietFrom, (v) => setNotify('quietFrom', v)), '—', timeInput(n.quietTo, (v) => setNotify('quietTo', v))),
+      ),
+    ),
+  );
+}
+
+function sizeText(bytes) {
+  return bytes >= 1024 * 1024 ? t('settings.sizeMb', { v: num(bytes / 1024 / 1024, { maximumFractionDigits: 1 }) }) : t('settings.sizeKb', { v: num(Math.max(1, Math.round(bytes / 1024))) });
+}
+
+async function restore(b) {
+  if (!confirm(t('settings.restoreConfirm', { name: b.date ? prettyDate(b.date) : b.name }))) return;
+  const res = await window.api.backups.restore(b.name);
+  if (!res.ok) return toast(t('settings.restoreFailed'));
+  state.data = res.data;
+  backups = null;
+  setTheme(state.data.settings.theme);
+  setLanguage(state.data.settings.lang);
+  toast(t('settings.restored'));
+}
+
+function backupsCard() {
+  // The list is re-read when the screen is opened again (a new daily copy may have appeared).
+  if (backups === null || Date.now() - backupsAt > 30000) {
+    backups ||= [];
+    backupsAt = Date.now();
+    window.api.backups.list().then((list) => {
+      backups = list;
+      if (state.view === 'settings') update(() => {}, { silent: false });
+    });
+  }
+  return card(
+    t('settings.backups'),
+    h('button', { class: 'btn ghost sm', onclick: () => window.api.backups.open() }, icon('folder', 14), t('settings.openFolder')),
+    h('p', { class: 'muted', style: { margin: '0 0 6px' } }, t('settings.backupsHint')),
+    backups.length
+      ? h(
+          'div',
+          { class: 'list backup-list' },
+          backups.map((b) =>
+            h(
+              'div',
+              { class: 'list-row compact' },
+              h('div', { class: 'grow' }, h('div', { class: 'title' }, b.date ? prettyDate(b.date) : t('settings.beforeRestore')), h('div', { class: 'meta' }, `${dateTime(b.mtime)} · ${sizeText(b.size)}`)),
+              h('button', { class: 'btn ghost sm', onclick: () => restore(b) }, t('settings.restore')),
+            ),
+          ),
+        )
+      : h('p', { class: 'meta' }, t('settings.noBackups')),
   );
 }
 
@@ -72,7 +156,7 @@ export function settingsView() {
     });
   }
 
-  const keyInput = h('input', { class: 'input', type: 'password', placeholder: keySet ? 'Ключ сохранён — вставь новый, чтобы заменить' : 'xai-…', style: { width: '320px' } });
+  const keyInput = h('input', { class: 'input', type: 'password', placeholder: keySet ? t('settings.keyReplacePh') : 'xai-…', style: { width: '320px' } });
   const modelInput = h('input', {
     class: 'input',
     value: s.grokModel,
@@ -95,11 +179,11 @@ export function settingsView() {
             keySet = await window.api.grok.setKey(keyInput.value.trim());
             resetGrokKeyCache();
             models = null;
-            toast('Ключ сохранён');
+            toast(t('settings.keySaved'));
             update(() => {});
           },
         },
-        'Сохранить',
+        t('common.save'),
       ),
       keySet &&
         h(
@@ -109,17 +193,17 @@ export function settingsView() {
             onclick: async () => {
               keySet = await window.api.grok.setKey('');
               resetGrokKeyCache();
-              toast('Ключ удалён');
+              toast(t('settings.keyRemoved'));
               update(() => {});
             },
           },
-          'Удалить',
+          t('common.delete'),
         ),
     );
   const modelRow = () =>
     settingRow(
-      'Модель',
-      models ? `Доступно моделей: ${models.length}` : 'По умолчанию grok-4. Список доступных моделей можно загрузить с xAI.',
+      t('settings.model'),
+      models ? t('settings.modelsCount', { n: models.length }) : t('settings.modelHint'),
       h(
         'div',
         { class: 'row' },
@@ -132,13 +216,13 @@ export function settingsView() {
             disabled: !keySet,
             onclick: async () => {
               const res = await window.api.grok.models();
-              if (!res.ok) return toast(res.code === 'bad_key' ? 'Ключ не подошёл' : `Не удалось: ${res.message || res.code}`);
+              if (!res.ok) return toast(res.code === 'bad_key' ? t('settings.keyBad') : t('settings.failed', { reason: res.message || res.code }));
               models = res.models;
-              toast(`Моделей: ${models.length}. Выбери в поле «Модель».`);
+              toast(t('settings.modelsLoaded', { n: models.length }));
               update(() => {});
             },
           },
-          'Загрузить список моделей',
+          t('settings.loadModels'),
         ),
       ),
     );
@@ -146,10 +230,29 @@ export function settingsView() {
   return h(
     'div',
     { class: 'page', style: { maxWidth: '820px' } },
-    h('div', { class: 'page-head' }, h('h1', {}, 'Настройки')),
+    h('div', { class: 'page-head' }, h('h1', {}, t('nav.settings'))),
     h(
       'div',
       { class: 'stack' },
+      card(
+        t('settings.general'),
+        null,
+        h(
+          'div',
+          { class: 'list' },
+          settingRow(
+            t('settings.language'),
+            t('settings.languageHint'),
+            seg(
+              LANGS.map((l) => [l, t(`lang.${l}`)]),
+              s.lang,
+              setLanguage,
+            ),
+          ),
+          settingRow(t('settings.closeToTray'), t('settings.closeToTrayHint'), onOff(s.closeToTray, (v) => update((d) => (d.settings.closeToTray = v)))),
+          settingRow(t('settings.autoStart'), t('settings.autoStartHint'), onOff(s.autoStart, (v) => update((d) => (d.settings.autoStart = v)))),
+        ),
+      ),
       card(
         'Grok (xAI)',
         null,
@@ -157,13 +260,13 @@ export function settingsView() {
           'div',
           { class: 'list' },
           settingRow(
-            'Режим',
-            'Подписка без оплаты за токены: grok.com внутри планера или в твоём браузере (если входишь через Google — выбери «В браузере»). API-ключ — свой чат через xAI API, токены оплачиваются отдельно.',
+            t('settings.grokMode'),
+            t('settings.grokModeHint'),
             seg(
               [
-                ['web', 'Внутри'],
-                ['browser', 'В браузере'],
-                ['api', 'API-ключ'],
+                ['web', t('settings.grokWeb')],
+                ['browser', t('grok.mode.browser')],
+                ['api', t('grok.mode.api')],
               ],
               s.grokMode,
               (v) => update((d) => (d.settings.grokMode = v)),
@@ -171,41 +274,52 @@ export function settingsView() {
           ),
           s.grokMode === 'api' &&
             settingRow(
-              'Ключ API',
-              h('span', {}, keySet ? 'Сохранён, зашифрован на этом компьютере. ' : 'Не задан. ', 'Получить: ', h('a', { href: 'https://console.x.ai', target: '_blank', style: { color: 'inherit' } }, 'console.x.ai'), ' → API Keys.'),
+              t('settings.apiKey'),
+              h('span', {}, keySet ? t('settings.keyStored') : t('settings.keyNone'), t('settings.keyGet'), h('a', { href: 'https://console.x.ai', target: '_blank', style: { color: 'inherit' } }, 'console.x.ai'), ' → API Keys.'),
               keyControls(),
             ),
           s.grokMode === 'api' && modelRow(),
           s.grokMode === 'web' &&
             settingRow(
-              'Аккаунт grok.com',
-              'Вход хранится только в планере. Выйти можно здесь или на вкладке Grok.',
+              t('settings.grokAccount'),
+              t('settings.grokAccountHint'),
               h(
                 'button',
                 {
                   class: 'btn',
                   onclick: async () => {
                     await window.api.grokWeb.logout();
-                    toast('Вышел из grok.com');
+                    toast(t('grok.loggedOut'));
                   },
                 },
-                'Выйти из grok.com',
+                t('settings.grokLogout'),
               ),
             ),
         ),
       ),
       card(
-        'Внешний вид',
+        t('settings.appearance'),
         null,
         h(
           'div',
           { class: 'list' },
-          settingRow('Тема', null, seg([['light', 'Светлая'], ['dark', 'Тёмная']], s.theme, setTheme)),
-          mediaRow('background', 'Фон приложения', 'Картинка на заднем фоне (JPG, PNG, WebP, GIF)'),
+          settingRow(
+            t('settings.theme'),
+            null,
+            seg(
+              [
+                ['light', t('settings.themeLight')],
+                ['dark', t('settings.themeDark')],
+              ],
+              s.theme,
+              setTheme,
+            ),
+          ),
+          mediaRow('background', t('settings.background'), t('settings.backgroundHint')),
           s.background &&
             settingRow(
-              'Затемнение фона',
-              'Чем больше — тем спокойнее фон и читабельнее текст',
+              t('settings.veil'),
+              t('settings.veilHint'),
               h('input', {
                 type: 'range',
                 class: 'range',
@@ -219,16 +333,39 @@ export function settingsView() {
                 onchange: () => update(() => {}, { silent: true }),
               }),
             ),
-          mediaRow('banner', 'Баннер в меню', 'Видео, GIF или картинка за логотипом слева сверху (MP4, WebM, GIF, PNG, JPG)'),
-          settingRow('Питомцы', 'Сефирка, Гудсик и корги Бублик внизу меню', seg([[true, 'Показывать'], [false, 'Скрыть']], s.pets !== false, (v) => update((d) => (d.settings.pets = v)))),
-          s.pets !== false && settingRow('Цвет питомцев', 'Чёрно-белые под стиль приложения или в цвете', seg([[false, 'Ч/б'], [true, 'Цветные']], !!s.petsColor, (v) => update((d) => (d.settings.petsColor = v)))),
+          mediaRow('banner', t('settings.banner'), t('settings.bannerHint')),
           settingRow(
-            'Валюта',
-            'Символ в суммах',
+            t('settings.pets'),
+            t('settings.petsHint'),
             seg(
               [
-                ['€', 'Евро €'],
-                ['₴', 'Гривна ₴'],
+                [true, t('settings.show')],
+                [false, t('settings.hide')],
+              ],
+              s.pets !== false,
+              (v) => update((d) => (d.settings.pets = v)),
+            ),
+          ),
+          s.pets !== false &&
+            settingRow(
+              t('settings.petsColor'),
+              t('settings.petsColorHint'),
+              seg(
+                [
+                  [false, t('settings.mono')],
+                  [true, t('settings.color')],
+                ],
+                !!s.petsColor,
+                (v) => update((d) => (d.settings.petsColor = v)),
+              ),
+            ),
+          settingRow(
+            t('common.currency'),
+            t('settings.currencyHint'),
+            seg(
+              [
+                ['€', t('cur.eurShort')],
+                ['₴', t('cur.uahShort')],
               ],
               s.currency,
               (v) => update((d) => (d.settings.currency = v)),
@@ -236,15 +373,9 @@ export function settingsView() {
           ),
         ),
       ),
-      card(
-        'Данные',
-        null,
-        h(
-          'div',
-          { class: 'list' },
-          settingRow('Где хранятся', 'Всё лежит только на этом компьютере (data.json + резервная копия). Синхронизации нет.', h('button', { class: 'btn', onclick: () => window.api.openDataDir() }, 'Открыть папку')),
-        ),
-      ),
+      notificationsCard(),
+      card(t('settings.data'), null, h('div', { class: 'list' }, settingRow(t('settings.whereStored'), t('settings.whereStoredHint'), h('button', { class: 'btn', onclick: () => window.api.openDataDir() }, t('settings.openFolder'))))),
+      backupsCard(),
     ),
   );
 }

@@ -1,5 +1,7 @@
 // Telegram channel analytics. Parses the public preview page t.me/s/<name> (no bot or API key needed)
 // and computes stats from the stored posts and subscriber snapshots. Pure functions, unit-tested.
+import { t } from './i18n.js';
+import { weekdays } from './dates.js';
 
 const decode = (s) =>
   s
@@ -132,34 +134,34 @@ export function addSnapshot(snapshots, date, subscribers) {
   return [...rest, { date, subscribers }].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** Short text summary of the channel for Grok. */
+/** Short text summary of the channel for Grok, in the interface language. */
 export function summaryForAI(channel, todayStr, now = Date.now()) {
   const posts = postList(channel);
   const w7 = windowStats(posts, 7, now);
   const w30 = windowStats(posts, 30, now);
   const subs = channel.snapshots.at(-1)?.subscribers || 0;
   const d30 = subscriberDelta(channel.snapshots, 30, todayStr);
-  const t = timing(posts.slice(0, 100));
-  const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const tm = timing(posts.slice(0, 100));
+  const days = weekdays();
   const top = [...posts]
     .slice(0, 100)
     .sort((a, b) => b.views - a.views)
     .slice(0, 5);
   const recent = posts.slice(0, 15);
   const line = (p) =>
-    `- ${p.date.slice(0, 16).replace('T', ' ')} | ${p.views} просм. | ${p.reactions} реакц. | ${p.media || 'текст'} | ${p.text.replace(/\s+/g, ' ').slice(0, 140) || '(без текста)'}`;
+    `- ${p.date.slice(0, 16).replace('T', ' ')} | ${t('ai.ch.views', { n: p.views })} | ${t('ai.ch.reactions', { n: p.reactions })} | ${p.media || t('ai.ch.text')} | ${p.text.replace(/\s+/g, ' ').slice(0, 140) || t('ai.ch.noText')}`;
   return [
-    `Канал: ${channel.title} (@${channel.username})`,
-    `Подписчиков: ${subs}${d30 ? `, изменение с ${d30.from}: ${d30.delta >= 0 ? '+' : ''}${d30.delta}` : ''}`,
-    `За 7 дней: ${w7.count} постов, средний охват ${Math.round(w7.avgViews)}, реакций в среднем ${w7.avgReactions.toFixed(1)}`,
-    `За 30 дней: ${w30.count} постов, средний охват ${Math.round(w30.avgViews)}, ERR ${subs ? ((w30.avgViews / subs) * 100).toFixed(1) : '—'}%`,
-    `Средний охват по дням недели: ${t.weekdays.map((d, i) => `${days[i]} ${Math.round(d.avg)} (${d.n})`).join(', ')}`,
-    `По времени публикации: ${t.slots.map((s) => `${s.from}–${s.from + 3}ч ${Math.round(s.avg)} (${s.n})`).join(', ')}`,
+    t('ai.ch.channel', { title: channel.title, username: channel.username }),
+    t('ai.ch.subs', { n: subs }) + (d30 ? t('ai.ch.subsChange', { from: d30.from, delta: `${d30.delta >= 0 ? '+' : ''}${d30.delta}` }) : ''),
+    t('ai.ch.week', { count: w7.count, views: Math.round(w7.avgViews), reactions: w7.avgReactions.toFixed(1) }),
+    t('ai.ch.month', { count: w30.count, views: Math.round(w30.avgViews), err: subs ? ((w30.avgViews / subs) * 100).toFixed(1) : '—' }),
+    t('ai.ch.byDay', { list: tm.weekdays.map((d, i) => `${days[i]} ${Math.round(d.avg)} (${d.n})`).join(', ') }),
+    t('ai.ch.bySlot', { list: tm.slots.map((s) => `${s.from}–${s.from + 3} ${Math.round(s.avg)} (${s.n})`).join(', ') }),
     '',
-    'Топ-5 постов по охвату:',
+    t('ai.ch.top'),
     ...top.map(line),
     '',
-    'Последние посты:',
+    t('ai.ch.recent'),
     ...recent.map(line),
   ].join('\n');
 }

@@ -1,0 +1,1059 @@
+{
+ "version": 3,
+ "settings": {
+  "theme": "light",
+  "currency": "€",
+  "pets": true,
+  "petsColor": false,
+  "grokModel": "grok-4",
+  "grokMode": "web",
+  "activeChannel": "",
+  "background": "",
+  "banner": "",
+  "veil": 70
+ },
+ "rates": {
+  "€": 1,
+  "₴": 48,
+  "$": 1.08,
+  "updatedAt": ""
+ },
+ "accounts": [
+  {
+   "id": "trust",
+   "name": "Trust Wallet (крипта)",
+   "currency": "$",
+   "balance": 840,
+   "updatedAt": "2026-10-26",
+   "history": [
+    {
+     "date": "2026-10-09",
+     "balance": 700
+    },
+    {
+     "date": "2026-10-26",
+     "balance": 840
+    }
+   ]
+  },
+  {
+   "id": "ua",
+   "name": "Украинская карта",
+   "currency": "₴",
+   "balance": 12500,
+   "updatedAt": "2026-10-28",
+   "history": [
+    {
+     "date": "2026-10-09",
+     "balance": 9000
+    },
+    {
+     "date": "2026-10-28",
+     "balance": 12500
+    }
+   ]
+  },
+  {
+   "id": "de",
+   "name": "Немецкая карта",
+   "currency": "€",
+   "balance": 1630,
+   "updatedAt": "2026-10-29",
+   "history": [
+    {
+     "date": "2026-10-09",
+     "balance": 1200
+    },
+    {
+     "date": "2026-10-29",
+     "balance": 1630
+    }
+   ]
+  }
+ ],
+ "finance": [
+  {
+   "id": "d0",
+   "type": "income",
+   "amount": 60000,
+   "category": "Зарплата",
+   "date": "2026-10-26",
+   "note": ""
+  },
+  {
+   "id": "d1",
+   "type": "income",
+   "amount": 8000,
+   "category": "Реклама в канале",
+   "date": "2026-10-17",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d2",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-10-27",
+   "note": "Аренда"
+  },
+  {
+   "id": "d3",
+   "type": "expense",
+   "amount": 9000,
+   "category": "Еда",
+   "date": "2026-10-23",
+   "note": ""
+  },
+  {
+   "id": "d4",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-10-20",
+   "note": ""
+  },
+  {
+   "id": "d5",
+   "type": "expense",
+   "amount": 4000,
+   "category": "Реклама канала",
+   "date": "2026-10-14",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d6",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-10-11",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d7",
+   "type": "income",
+   "amount": 61500,
+   "category": "Зарплата",
+   "date": "2026-09-26",
+   "note": ""
+  },
+  {
+   "id": "d8",
+   "type": "income",
+   "amount": 11700,
+   "category": "Реклама в канале",
+   "date": "2026-09-17",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d9",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-09-27",
+   "note": "Аренда"
+  },
+  {
+   "id": "d10",
+   "type": "expense",
+   "amount": 10300,
+   "category": "Еда",
+   "date": "2026-09-23",
+   "note": ""
+  },
+  {
+   "id": "d11",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-09-20",
+   "note": ""
+  },
+  {
+   "id": "d12",
+   "type": "expense",
+   "amount": 4900,
+   "category": "Реклама канала",
+   "date": "2026-09-14",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d13",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-09-11",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d14",
+   "type": "income",
+   "amount": 63000,
+   "category": "Зарплата",
+   "date": "2026-08-27",
+   "note": ""
+  },
+  {
+   "id": "d15",
+   "type": "income",
+   "amount": 15400,
+   "category": "Реклама в канале",
+   "date": "2026-08-18",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d16",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-08-28",
+   "note": "Аренда"
+  },
+  {
+   "id": "d17",
+   "type": "expense",
+   "amount": 11600,
+   "category": "Еда",
+   "date": "2026-08-24",
+   "note": ""
+  },
+  {
+   "id": "d18",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-08-21",
+   "note": ""
+  },
+  {
+   "id": "d19",
+   "type": "expense",
+   "amount": 5800,
+   "category": "Реклама канала",
+   "date": "2026-08-15",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d20",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-08-12",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d21",
+   "type": "income",
+   "amount": 64500,
+   "category": "Зарплата",
+   "date": "2026-07-28",
+   "note": ""
+  },
+  {
+   "id": "d22",
+   "type": "income",
+   "amount": 10100,
+   "category": "Реклама в канале",
+   "date": "2026-07-19",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d23",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-07-29",
+   "note": "Аренда"
+  },
+  {
+   "id": "d24",
+   "type": "expense",
+   "amount": 12900,
+   "category": "Еда",
+   "date": "2026-07-25",
+   "note": ""
+  },
+  {
+   "id": "d25",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-07-22",
+   "note": ""
+  },
+  {
+   "id": "d26",
+   "type": "expense",
+   "amount": 6700,
+   "category": "Реклама канала",
+   "date": "2026-07-16",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d27",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-07-13",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d28",
+   "type": "income",
+   "amount": 66000,
+   "category": "Зарплата",
+   "date": "2026-06-28",
+   "note": ""
+  },
+  {
+   "id": "d29",
+   "type": "income",
+   "amount": 13800,
+   "category": "Реклама в канале",
+   "date": "2026-06-19",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d30",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-06-29",
+   "note": "Аренда"
+  },
+  {
+   "id": "d31",
+   "type": "expense",
+   "amount": 10200,
+   "category": "Еда",
+   "date": "2026-06-25",
+   "note": ""
+  },
+  {
+   "id": "d32",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-06-22",
+   "note": ""
+  },
+  {
+   "id": "d33",
+   "type": "expense",
+   "amount": 4600,
+   "category": "Реклама канала",
+   "date": "2026-06-16",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d34",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-06-13",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d35",
+   "type": "income",
+   "amount": 67500,
+   "category": "Зарплата",
+   "date": "2026-05-29",
+   "note": ""
+  },
+  {
+   "id": "d36",
+   "type": "income",
+   "amount": 8500,
+   "category": "Реклама в канале",
+   "date": "2026-05-20",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d37",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-05-30",
+   "note": "Аренда"
+  },
+  {
+   "id": "d38",
+   "type": "expense",
+   "amount": 11500,
+   "category": "Еда",
+   "date": "2026-05-26",
+   "note": ""
+  },
+  {
+   "id": "d39",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-05-23",
+   "note": ""
+  },
+  {
+   "id": "d40",
+   "type": "expense",
+   "amount": 5500,
+   "category": "Реклама канала",
+   "date": "2026-05-17",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d41",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-05-14",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d42",
+   "type": "income",
+   "amount": 69000,
+   "category": "Зарплата",
+   "date": "2026-04-29",
+   "note": ""
+  },
+  {
+   "id": "d43",
+   "type": "income",
+   "amount": 12200,
+   "category": "Реклама в канале",
+   "date": "2026-04-20",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d44",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-04-30",
+   "note": "Аренда"
+  },
+  {
+   "id": "d45",
+   "type": "expense",
+   "amount": 12800,
+   "category": "Еда",
+   "date": "2026-04-26",
+   "note": ""
+  },
+  {
+   "id": "d46",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-04-23",
+   "note": ""
+  },
+  {
+   "id": "d47",
+   "type": "expense",
+   "amount": 6400,
+   "category": "Реклама канала",
+   "date": "2026-04-17",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d48",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-04-14",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d49",
+   "type": "income",
+   "amount": 70500,
+   "category": "Зарплата",
+   "date": "2026-03-30",
+   "note": ""
+  },
+  {
+   "id": "d50",
+   "type": "income",
+   "amount": 15900,
+   "category": "Реклама в канале",
+   "date": "2026-03-21",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d51",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-03-31",
+   "note": "Аренда"
+  },
+  {
+   "id": "d52",
+   "type": "expense",
+   "amount": 10100,
+   "category": "Еда",
+   "date": "2026-03-27",
+   "note": ""
+  },
+  {
+   "id": "d53",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-03-24",
+   "note": ""
+  },
+  {
+   "id": "d54",
+   "type": "expense",
+   "amount": 4300,
+   "category": "Реклама канала",
+   "date": "2026-03-18",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d55",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-03-15",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d56",
+   "type": "income",
+   "amount": 72000,
+   "category": "Зарплата",
+   "date": "2026-02-28",
+   "note": ""
+  },
+  {
+   "id": "d57",
+   "type": "income",
+   "amount": 10600,
+   "category": "Реклама в канале",
+   "date": "2026-02-19",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d58",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-03-01",
+   "note": "Аренда"
+  },
+  {
+   "id": "d59",
+   "type": "expense",
+   "amount": 11400,
+   "category": "Еда",
+   "date": "2026-02-25",
+   "note": ""
+  },
+  {
+   "id": "d60",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-02-22",
+   "note": ""
+  },
+  {
+   "id": "d61",
+   "type": "expense",
+   "amount": 5200,
+   "category": "Реклама канала",
+   "date": "2026-02-16",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d62",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-02-13",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d63",
+   "type": "income",
+   "amount": 73500,
+   "category": "Зарплата",
+   "date": "2026-01-29",
+   "note": ""
+  },
+  {
+   "id": "d64",
+   "type": "income",
+   "amount": 14300,
+   "category": "Реклама в канале",
+   "date": "2026-01-20",
+   "note": "Пост для партнёра"
+  },
+  {
+   "id": "d65",
+   "type": "expense",
+   "amount": 25000,
+   "category": "Жильё",
+   "date": "2026-01-30",
+   "note": "Аренда"
+  },
+  {
+   "id": "d66",
+   "type": "expense",
+   "amount": 12700,
+   "category": "Еда",
+   "date": "2026-01-26",
+   "note": ""
+  },
+  {
+   "id": "d67",
+   "type": "expense",
+   "amount": 3200,
+   "category": "Транспорт",
+   "date": "2026-01-23",
+   "note": ""
+  },
+  {
+   "id": "d68",
+   "type": "expense",
+   "amount": 6100,
+   "category": "Реклама канала",
+   "date": "2026-01-17",
+   "note": "Закуп в @somechannel"
+  },
+  {
+   "id": "d69",
+   "type": "expense",
+   "amount": 990,
+   "category": "Связь и подписки",
+   "date": "2026-01-14",
+   "note": "Telegram Premium"
+  },
+  {
+   "id": "d70",
+   "type": "expense",
+   "amount": 640,
+   "category": "Еда",
+   "date": "2026-10-29",
+   "note": "Кофе и сэндвич"
+  },
+  {
+   "id": "d71",
+   "type": "expense",
+   "amount": 2100,
+   "category": "Развлечения",
+   "date": "2026-10-28",
+   "note": "Кино"
+  },
+  {
+   "id": "pf1",
+   "type": "income",
+   "amount": 300,
+   "category": "Продажи",
+   "date": "2026-10-26",
+   "note": "Заказ",
+   "projectId": "pr1"
+  }
+ ],
+ "budgets": {
+  "Еда": 12000,
+  "Развлечения": 2000,
+  "Транспорт": 4000
+ },
+ "recurring": [
+  {
+   "id": "r1",
+   "active": true,
+   "type": "expense",
+   "title": "Аренда",
+   "amount": 25000,
+   "category": "Жильё",
+   "day": 1,
+   "next": "2026-11-02"
+  },
+  {
+   "id": "r2",
+   "active": true,
+   "type": "expense",
+   "title": "Spotify",
+   "amount": 11,
+   "category": "Связь и подписки",
+   "day": 2,
+   "next": "2026-11-03"
+  },
+  {
+   "id": "r3",
+   "active": true,
+   "type": "income",
+   "title": "Зарплата",
+   "amount": 60000,
+   "category": "Зарплата",
+   "day": 25,
+   "next": "2026-11-25"
+  }
+ ],
+ "goals": [
+  {
+   "id": "g1",
+   "title": "Подушка безопасности",
+   "target": 3000,
+   "deadline": "2027-04-27",
+   "contributions": [
+    {
+     "amount": 900,
+     "date": "2026-09-29"
+    }
+   ]
+  }
+ ],
+ "tasks": [
+  {
+   "id": "t1",
+   "title": "Написать пост про итоги недели",
+   "date": "2026-10-29",
+   "done": false
+  },
+  {
+   "id": "t2",
+   "title": "Ответить рекламодателю",
+   "date": "2026-10-28",
+   "done": false
+  },
+  {
+   "id": "t3",
+   "title": "Оплатить интернет",
+   "date": "2026-10-29",
+   "done": true,
+   "doneAt": "2026-10-29"
+  },
+  {
+   "id": "t4",
+   "title": "Подготовить розыгрыш",
+   "date": "2026-10-31",
+   "done": false
+  }
+ ],
+ "habits": [
+  {
+   "id": "h1",
+   "title": "30 минут немецкого",
+   "days": [
+    "2026-10-29",
+    "2026-10-28",
+    "2026-10-27",
+    "2026-10-26",
+    "2026-10-24"
+   ]
+  },
+  {
+   "id": "h2",
+   "title": "Один отклик в день",
+   "days": [
+    "2026-10-28",
+    "2026-10-27"
+   ]
+  }
+ ],
+ "notes": [
+  {
+   "id": "n1",
+   "title": "Вопросы на собеседование",
+   "text": "Wie sieht ein typischer Tag aus?\nGibt es eine Übernahme nach der Ausbildung?",
+   "pinned": true,
+   "updatedAt": "2026-10-27"
+  },
+  {
+   "id": "n2",
+   "title": "Идеи постов",
+   "text": "Итоги месяца\nКак я делал планер",
+   "updatedAt": "2026-10-24"
+  }
+ ],
+ "channels": [],
+ "contentPlan": [
+  {
+   "id": "c1",
+   "channel": "durov",
+   "title": "Итоги недели",
+   "date": "2026-10-30",
+   "status": "planned",
+   "note": ""
+  },
+  {
+   "id": "c2",
+   "channel": "durov",
+   "title": "Розыгрыш",
+   "date": "2026-11-01",
+   "status": "planned",
+   "note": ""
+  },
+  {
+   "id": "c3",
+   "channel": "durov",
+   "title": "Как я ищу Ausbildung",
+   "date": "",
+   "status": "idea",
+   "note": ""
+  }
+ ],
+ "ads": [
+  {
+   "id": "a1",
+   "channel": "durov",
+   "kind": "buy",
+   "partner": "@techchannel",
+   "date": "2026-10-19",
+   "price": 40,
+   "gained": 120,
+   "views": 3000
+  },
+  {
+   "id": "a2",
+   "channel": "durov",
+   "kind": "sell",
+   "partner": "Онлайн-школа",
+   "date": "2026-10-25",
+   "price": 60
+  }
+ ],
+ "career": {
+  "applications": [
+   {
+    "id": "p1",
+    "company": "Deutsche Bahn",
+    "position": "Fachinformatiker Anwendungsentwicklung",
+    "kind": "ausbildung",
+    "city": "Berlin",
+    "status": "sent",
+    "sentAt": "2026-10-20",
+    "followUp": "2026-10-27"
+   },
+   {
+    "id": "p2",
+    "company": "Siemens",
+    "position": "Fachinformatiker Systemintegration",
+    "kind": "ausbildung",
+    "city": "München",
+    "status": "interview",
+    "sentAt": "2026-10-14"
+   },
+   {
+    "id": "p3",
+    "company": "REWE",
+    "position": "Kaufmann im Einzelhandel",
+    "kind": "ausbildung",
+    "city": "Köln",
+    "status": "wish"
+   },
+   {
+    "id": "p4",
+    "company": "Lidl",
+    "position": "Werkstudent IT",
+    "kind": "werkstudent",
+    "city": "Berlin",
+    "status": "sent",
+    "sentAt": "2026-10-28"
+   },
+   {
+    "id": "p5",
+    "company": "Zalando",
+    "position": "Praktikum Frontend",
+    "kind": "praktikum",
+    "city": "Berlin",
+    "status": "rejected",
+    "sentAt": "2026-10-04"
+   }
+  ],
+  "docs": [
+   {
+    "id": "doc0",
+    "title": "Lebenslauf (резюме, с фото)",
+    "done": false
+   },
+   {
+    "id": "doc1",
+    "title": "Anschreiben — шаблон",
+    "done": false
+   },
+   {
+    "id": "doc2",
+    "title": "Zeugnisse — переводы аттестата/диплома",
+    "done": false
+   },
+   {
+    "id": "doc3",
+    "title": "Sprachzertifikat (B1/B2)",
+    "done": false
+   },
+   {
+    "id": "doc4",
+    "title": "Aufenthaltstitel / разрешение на работу",
+    "done": false
+   },
+   {
+    "id": "doc5",
+    "title": "Anerkennung — признание школьного аттестата",
+    "done": false
+   },
+   {
+    "id": "doc6",
+    "title": "Профиль на Arbeitsagentur / Azubiyo / Indeed",
+    "done": false
+   }
+  ],
+  "weeklyGoal": 5
+ },
+ "projects": [
+  {
+   "id": "pr1",
+   "name": "Planner",
+   "status": "active",
+   "description": "Десктопный планер",
+   "money": "Продажа шаблонов",
+   "hours": [
+    {
+     "hours": 12,
+     "date": "2026-10-27"
+    }
+   ],
+   "milestones": [
+    {
+     "id": "m1",
+     "title": "Релиз 1.3",
+     "done": true,
+     "doneAt": "2026-10-29"
+    },
+    {
+     "id": "m2",
+     "title": "Сайт",
+     "done": false
+    }
+   ]
+  },
+  {
+   "id": "pr2",
+   "name": "ELT-бот",
+   "status": "launched",
+   "description": "Telegram Mini App",
+   "money": "Реклама, подписки",
+   "hours": [
+    {
+     "hours": 40,
+     "date": "2026-10-23"
+    }
+   ],
+   "milestones": []
+  }
+ ],
+ "wishlist": [
+  {
+   "id": 1245620,
+   "name": "ELDEN RING",
+   "image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1245620/capsule_231x87.jpg",
+   "target": 40,
+   "history": []
+  },
+  {
+   "id": 1091500,
+   "name": "Cyberpunk 2077",
+   "image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1091500/capsule_231x87.jpg",
+   "target": null,
+   "history": []
+  }
+ ],
+ "ranks": {
+  "dota": {
+   "goal": 4000,
+   "entries": [
+    {
+     "id": "k1",
+     "date": "2026-09-19",
+     "value": 3050
+    },
+    {
+     "id": "k2",
+     "date": "2026-10-09",
+     "value": 3180,
+     "note": "Проиграл линию, мало стакал"
+    },
+    {
+     "id": "k3",
+     "date": "2026-10-27",
+     "value": 3320,
+     "note": "Хорошо зашёл Pudge"
+    }
+   ]
+  },
+  "faceit": {
+   "goal": 1351,
+   "entries": [
+    {
+     "id": "f1",
+     "date": "2026-09-29",
+     "value": 1120
+    },
+    {
+     "id": "f2",
+     "date": "2026-10-26",
+     "value": 1205
+    }
+   ]
+  },
+  "deadlock": {
+   "goal": 71,
+   "entries": [
+    {
+     "id": "l1",
+     "date": "2026-10-04",
+     "value": 50
+    },
+    {
+     "id": "l2",
+     "date": "2026-10-28",
+     "value": 56
+    }
+   ]
+  }
+ },
+ "clips": [
+  {
+   "id": "v1",
+   "title": "Хук через всю карту",
+   "game": "Dota 2",
+   "status": "published",
+   "date": "2026-10-24",
+   "views": {
+    "tiktok": 12400,
+    "shorts": 3100,
+    "youtube": 0
+   }
+  },
+  {
+   "id": "v2",
+   "title": "Эйс с дигла",
+   "game": "CS2",
+   "status": "edit",
+   "views": {}
+  },
+  {
+   "id": "v3",
+   "title": "Топ-5 фейлов недели",
+   "game": "Deadlock",
+   "status": "idea",
+   "views": {}
+  }
+ ],
+ "chat": [
+  {
+   "role": "user",
+   "content": "Посмотри на мои финансы и скажи, где я теряю деньги."
+  },
+  {
+   "role": "assistant",
+   "content": "### Коротко\nТы откладываешь **~40%** дохода — это хорошо.\n\n- Реклама канала: 5 тыс. ₽/мес — проверь окупаемость закупов\n- Еда: можно срезать 10–15%\n\n1. Заведи лимит на развлечения\n2. Считай цену подписчика с каждого закупа"
+  }
+ ]
+}

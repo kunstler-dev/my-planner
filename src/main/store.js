@@ -1,34 +1,51 @@
-// JSON store in userData: atomic write (tmp + rename) and a backup of the previous version.
+// JSON store in userData: atomic write (tmp + rename), a backup of the previous version and daily copies.
+// defaultData() and normalize() are the migration: any older file is read into the current shape.
 const fs = require('fs');
 const path = require('path');
+const { createBackups } = require('./backups');
 
+const VERSION = 4;
 const CURRENCIES = ['€', '₴'];
+const LANGS = ['ru', 'uk', 'de'];
 
+// Standard names are left empty and shown translated in the interface (older files keep their own text).
 function defaultAccounts() {
   return [
-    { id: 'trust', name: 'Trust Wallet (крипта)', currency: '$', balance: 0, updatedAt: '', history: [] },
-    { id: 'ua', name: 'Украинская карта', currency: '₴', balance: 0, updatedAt: '', history: [] },
-    { id: 'de', name: 'Немецкая карта', currency: '€', balance: 0, updatedAt: '', history: [] },
+    { id: 'trust', name: '', currency: '$', balance: 0, updatedAt: '', history: [] },
+    { id: 'ua', name: '', currency: '₴', balance: 0, updatedAt: '', history: [] },
+    { id: 'de', name: '', currency: '€', balance: 0, updatedAt: '', history: [] },
   ];
 }
 
-// Bewerbung checklist for Germany.
+// Bewerbung checklist for Germany: doc0–doc6, titles come from the language files until edited.
 function defaultDocs() {
-  return [
-    'Lebenslauf (резюме, с фото)',
-    'Anschreiben — шаблон',
-    'Zeugnisse — переводы аттестата/диплома',
-    'Sprachzertifikat (B1/B2)',
-    'Aufenthaltstitel / разрешение на работу',
-    'Anerkennung — признание школьного аттестата',
-    'Профиль на Arbeitsagentur / Azubiyo / Indeed',
-  ].map((title, i) => ({ id: `doc${i}`, title, done: false }));
+  return Array.from({ length: 7 }, (_, i) => ({ id: `doc${i}`, title: '', done: false }));
+}
+
+// Notification types are switched on by default; quiet hours 23:00–08:00.
+function defaultNotify() {
+  return { recurring: true, budget: true, followUp: true, habits: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
 }
 
 function defaultData() {
   return {
-    version: 3,
-    settings: { theme: 'light', currency: '€', pets: true, petsColor: false, grokModel: 'grok-4', grokMode: 'web', activeChannel: '', background: '', banner: '', veil: 70 },
+    version: VERSION,
+    settings: {
+      theme: 'light',
+      lang: 'ru',
+      currency: '€',
+      pets: true,
+      petsColor: false,
+      grokModel: 'grok-4',
+      grokMode: 'web',
+      activeChannel: '',
+      background: '',
+      banner: '',
+      veil: 70,
+      closeToTray: true,
+      autoStart: false,
+      notify: defaultNotify(),
+    },
     // Units of each currency per 1 €; refreshed from the NBU or typed by hand.
     rates: { '€': 1, '₴': 48, $: 1.08, updatedAt: '' },
     accounts: defaultAccounts(),
@@ -48,8 +65,14 @@ function defaultData() {
     ranks: { dota: { goal: null, entries: [] }, faceit: { goal: null, entries: [] }, deadlock: { goal: null, entries: [] } },
     clips: [],
     chat: [],
+    // Background scheduler: task id → last run (ms).
+    sync: {},
+    // Notification journal: id → date it was last shown (one per day).
+    notified: {},
   };
 }
+
+const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
 function normalizeChannel(c) {
   return { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0, ...c };
@@ -60,8 +83,10 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 function normalize(raw) {
   const d = defaultData();
   if (!raw || typeof raw !== 'object') return d;
-  const settings = { ...d.settings, ...(raw.settings || {}) };
+  const settings = { ...d.settings, ...obj(raw.settings) };
   if (!CURRENCIES.includes(settings.currency)) settings.currency = '€';
+  if (!LANGS.includes(settings.lang)) settings.lang = 'ru';
+  settings.notify = { ...defaultNotify(), ...obj(raw.settings?.notify) };
   // v1 kept a single channel in `channel`.
   let channels = arr(raw.channels);
   if (!channels.length && raw.channel?.username) channels = [raw.channel];
@@ -69,7 +94,7 @@ function normalize(raw) {
   if (!channels.some((c) => c.username === settings.activeChannel)) settings.activeChannel = channels[0]?.username || '';
   delete settings.channel;
   return {
-    version: 3,
+    version: VERSION,
     settings,
     rates: { ...d.rates, ...(raw.rates || {}) },
     accounts: Array.isArray(raw.accounts) ? raw.accounts : d.accounts,
@@ -96,12 +121,15 @@ function normalize(raw) {
     ),
     clips: arr(raw.clips),
     chat: arr(raw.chat),
+    sync: obj(raw.sync),
+    notified: obj(raw.notified),
   };
 }
 
 function createStore(dir) {
   const file = path.join(dir, 'data.json');
   const backup = path.join(dir, 'data.backup.json');
+  const backups = createBackups(dir);
 
   function read(p) {
     try {
@@ -113,12 +141,18 @@ function createStore(dir) {
 
   return {
     file,
+    backups,
     load() {
       return normalize(read(file) || read(backup));
     },
     save(data) {
       fs.mkdirSync(dir, { recursive: true });
       const json = JSON.stringify(normalize(data), null, 1);
+      try {
+        backups.daily();
+      } catch {
+        // a failed daily copy must never block saving
+      }
       if (fs.existsSync(file)) fs.copyFileSync(file, backup);
       const tmp = `${file}.tmp`;
       fs.writeFileSync(tmp, json, 'utf8');
@@ -127,4 +161,4 @@ function createStore(dir) {
   };
 }
 
-module.exports = { createStore, defaultData, normalize };
+module.exports = { createStore, defaultData, normalize, VERSION };

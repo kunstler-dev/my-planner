@@ -1,11 +1,13 @@
 // Finance tabs: monthly budgets per category, recurring payments (rent, subscriptions, salary) and savings goals.
 import { state, update } from '../state.js';
 import { h, icon, money, uid, card, empty, toast } from '../ui.js';
+import { t } from '../i18n.js';
 import { formModal } from '../modal.js';
 import { barList } from '../charts.js';
 import { today, thisMonth, prettyDate, monthTitle } from '../dates.js';
-import { inMonth, DEFAULT_CATEGORIES } from '../finance-calc.js';
+import { inMonth, DEFAULT_CATEGORIES, CAT } from '../finance-calc.js';
 import { budgetStatus, firstOccurrence, upcoming, recurringMonthly, goalPlan, applyRecurring } from '../planner-calc.js';
+import { catLabel, catValue } from '../labels.js';
 import { financeTabs, categories } from './finance.js';
 
 function page(title, sub, actions, ...body) {
@@ -33,18 +35,19 @@ function tile(label, value, note, dark) {
 function budgetModal(category) {
   const cur = state.data.budgets[category];
   formModal(
-    category ? `Бюджет: ${category}` : 'Новый бюджет',
+    category ? t('budget.titleOf', { category: catLabel(category) }) : t('budget.new'),
     [
-      { key: 'category', label: 'Категория расходов', required: true, list: categories('expense') },
-      { key: 'limit', label: `Лимит в месяц, ${state.data.settings.currency}`, type: 'number', required: true },
+      { key: 'category', label: t('budget.category'), required: true, list: categories('expense').map(catLabel) },
+      { key: 'limit', label: t('budget.limit', { cur: state.data.settings.currency }), type: 'number', required: true },
     ],
-    { category: category || '', limit: cur ?? '' },
+    { category: category ? catLabel(category) : '', limit: cur ?? '' },
     {
       onSave: (v) => {
         if (!(v.limit > 0)) return false;
+        const value = catValue(v.category);
         update((d) => {
-          if (category && category !== v.category) delete d.budgets[category];
-          d.budgets[v.category] = v.limit;
+          if (category && category !== value) delete d.budgets[category];
+          d.budgets[value] = v.limit;
         });
       },
       onDelete: category ? () => update((d) => delete d.budgets[category]) : null,
@@ -59,18 +62,18 @@ export function budgetsTab() {
   const totalSpent = st.reduce((s, b) => s + b.spent, 0);
   const over = st.filter((b) => b.over);
   return page(
-    'Финансы',
-    `Бюджеты на ${monthTitle(month).toLowerCase()}`,
-    h('button', { class: 'btn primary', onclick: () => budgetModal(null) }, icon('plus', 16), 'Бюджет'),
+    t('nav.finance'),
+    t('budget.sub', { month: monthTitle(month) }),
+    h('button', { class: 'btn primary', onclick: () => budgetModal(null) }, icon('plus', 16), t('budget.add')),
     h(
       'div',
       { class: 'grid cols-3', style: { marginBottom: '16px' } },
-      tile('Потрачено из бюджетов', money(totalSpent), `из ${money(totalLimit)}`, true),
-      tile('Осталось', money(Math.max(0, totalLimit - totalSpent)), totalLimit ? `${Math.round((totalSpent / totalLimit) * 100)}% использовано` : null),
-      tile('Превышено', String(over.length), over.length ? over.map((b) => b.category).join(', ') : 'всё в рамках'),
+      tile(t('budget.spent'), money(totalSpent), t('common.ofAmount', { amount: money(totalLimit) }), true),
+      tile(t('budget.left'), money(Math.max(0, totalLimit - totalSpent)), totalLimit ? t('budget.used', { p: Math.round((totalSpent / totalLimit) * 100) }) : null),
+      tile(t('budget.overCount'), String(over.length), over.length ? over.map((b) => catLabel(b.category)).join(', ') : t('budget.allOk')),
     ),
     card(
-      'Лимиты по категориям',
+      t('budget.limits'),
       null,
       st.length
         ? h(
@@ -83,15 +86,15 @@ export function budgetsTab() {
                 h(
                   'div',
                   { class: 'bar-top' },
-                  h('div', { class: 'title' }, b.over ? `⚠ ${b.category}` : b.category),
-                  h('div', { class: 'num muted' }, `${money(b.spent)} из ${money(b.limit)}`),
+                  h('div', { class: 'title' }, b.over ? `⚠ ${catLabel(b.category)}` : catLabel(b.category)),
+                  h('div', { class: 'num muted' }, t('common.xOfY', { x: money(b.spent), y: money(b.limit) })),
                 ),
                 h('div', { class: `bar-track${b.over ? ' over' : ''}` }, h('div', { class: 'bar-fill', style: { width: `${Math.min(100, b.share * 100)}%` } })),
-                h('div', { class: 'meta' }, b.over ? `перерасход ${money(b.spent - b.limit)}` : `осталось ${money(b.limit - b.spent)}`),
+                h('div', { class: 'meta' }, b.over ? t('budget.overBy', { amount: money(b.spent - b.limit) }) : t('budget.leftOf', { amount: money(b.limit - b.spent) })),
               ),
             ),
           )
-        : empty('Бюджетов пока нет. Задай лимит, например «Еда — 300 в месяц», и здесь будет видно, сколько осталось.'),
+        : empty(t('budget.empty')),
     ),
   );
 }
@@ -102,24 +105,24 @@ function recurringModal(r) {
   const isNew = !r?.id;
   const v = { type: 'expense', title: '', amount: '', category: '', day: Number(today().slice(8, 10)), active: true, ...r };
   formModal(
-    isNew ? 'Регулярный платёж' : v.title,
+    isNew ? t('recurring.new') : v.title,
     [
       {
         key: 'type',
-        label: 'Тип',
+        label: t('common.type'),
         type: 'select',
         options: [
-          ['expense', 'Расход (аренда, подписка…)'],
-          ['income', 'Доход (зарплата, стипендия…)'],
+          ['expense', t('recurring.typeExpense')],
+          ['income', t('recurring.typeIncome')],
         ],
       },
-      { key: 'title', label: 'Название', required: true, placeholder: 'Например, Аренда или Spotify' },
-      { key: 'amount', label: `Сумма, ${state.data.settings.currency}`, type: 'number', required: true, half: true },
-      { key: 'day', label: 'День месяца', type: 'number', required: true, half: true },
-      { key: 'category', label: 'Категория', list: [...DEFAULT_CATEGORIES.expense, ...DEFAULT_CATEGORIES.income] },
-      { key: 'active', label: 'Активен — записывать автоматически каждый месяц', type: 'checkbox' },
+      { key: 'title', label: t('common.name'), required: true, placeholder: t('recurring.titlePh') },
+      { key: 'amount', label: t('common.amountCur', { cur: state.data.settings.currency }), type: 'number', required: true, half: true },
+      { key: 'day', label: t('recurring.day'), type: 'number', required: true, half: true },
+      { key: 'category', label: t('common.category'), list: [...new Set([...DEFAULT_CATEGORIES.expense, ...DEFAULT_CATEGORIES.income])].map(catLabel) },
+      { key: 'active', label: t('recurring.active'), type: 'checkbox' },
     ],
-    v,
+    { ...v, category: catLabel(v.category) },
     {
       onSave: (x) => {
         const day = Math.min(31, Math.max(1, Math.round(x.day || 1)));
@@ -128,7 +131,7 @@ function recurringModal(r) {
           ...v,
           ...x,
           day,
-          category: x.category || (x.type === 'income' ? 'Другое' : 'Связь и подписки'),
+          category: catValue(x.category) || (x.type === 'income' ? CAT.other : CAT.subscriptions),
           id: v.id || uid(),
           next: isNew || day !== v.day ? firstOccurrence(day, today()) : v.next,
         };
@@ -137,14 +140,14 @@ function recurringModal(r) {
           if (i >= 0) d.recurring[i] = rec;
           else d.recurring.push(rec);
         });
-        toast(`Следующая запись: ${prettyDate(rec.next)}`);
+        toast(t('recurring.nextToast', { date: prettyDate(rec.next) }));
       },
       onDelete: isNew ? null : () => update((d) => (d.recurring = d.recurring.filter((y) => y.id !== v.id))),
     },
   );
 }
 
-/** Creates finance entries for all due recurring payments. Called on start and on renders. */
+/** Creates finance entries for all due recurring payments. Called on start and when the date changes. */
 export function syncRecurring() {
   const res = applyRecurring(state.data.recurring, today(), uid);
   if (!res.entries.length) return 0;
@@ -166,25 +169,30 @@ export function recurringTab() {
     h(
       'div',
       { class: 'list-row', style: { cursor: 'pointer', opacity: r.active ? 1 : 0.5 }, onclick: () => recurringModal(r) },
-      h('div', { class: 'grow' }, h('div', { class: 'title' }, r.title), h('div', { class: 'meta' }, `${r.category} · каждое ${r.day} число${r.active ? ` · следующий ${prettyDate(r.next)}` : ' · на паузе'}`)),
+      h(
+        'div',
+        { class: 'grow' },
+        h('div', { class: 'title' }, r.title),
+        h('div', { class: 'meta' }, [catLabel(r.category), t('recurring.everyDay', { day: r.day }), r.active ? t('recurring.next', { date: prettyDate(r.next) }) : t('recurring.paused')].join(' · ')),
+      ),
       h('div', { class: `amount${r.type === 'expense' ? ' out' : ''}` }, money(r.type === 'income' ? r.amount : -r.amount, { sign: true })),
     );
   return page(
-    'Финансы',
-    'Аренда, подписки, зарплата — записываются сами в нужный день',
-    h('button', { class: 'btn primary', onclick: () => recurringModal(null) }, icon('plus', 16), 'Платёж'),
+    t('nav.finance'),
+    t('recurring.sub'),
+    h('button', { class: 'btn primary', onclick: () => recurringModal(null) }, icon('plus', 16), t('recurring.add')),
     h(
       'div',
       { class: 'grid cols-3', style: { marginBottom: '16px' } },
-      tile('Обязательные расходы в месяц', money(m.expense), `${list.filter((r) => r.active && r.type === 'expense').length} платежей`, true),
-      tile('Регулярный доход в месяц', money(m.income), null),
-      tile('Остаётся после обязательных', money(m.income - m.expense), m.income ? `${Math.round(((m.income - m.expense) / m.income) * 100)}% дохода свободно` : null),
+      tile(t('recurring.monthlyExpense'), money(m.expense), t('recurring.paymentsN', { n: list.filter((r) => r.active && r.type === 'expense').length }), true),
+      tile(t('recurring.monthlyIncome'), money(m.income), null),
+      tile(t('recurring.leftAfter'), money(m.income - m.expense), m.income ? t('recurring.freeShare', { p: Math.round(((m.income - m.expense) / m.income) * 100) }) : null),
     ),
     h(
       'div',
       { class: 'grid cols-2', style: { alignItems: 'start' } },
-      card('Все регулярные', null, list.length ? h('div', { class: 'list' }, list.map(row)) : empty('Добавь аренду, связь, подписки (Spotify, Telegram Premium) или зарплату.')),
-      card('Ближайшие 30 дней', null, soon.length ? h('div', { class: 'list' }, soon.map(row)) : empty('Ничего не запланировано')),
+      card(t('recurring.all'), null, list.length ? h('div', { class: 'list' }, list.map(row)) : empty(t('recurring.empty'))),
+      card(t('recurring.next30'), null, soon.length ? h('div', { class: 'list' }, soon.map(row)) : empty(t('recurring.nothing'))),
     ),
   );
 }
@@ -194,11 +202,11 @@ export function recurringTab() {
 function goalModal(g) {
   const isNew = !g?.id;
   formModal(
-    isNew ? 'Новая цель' : g.title,
+    isNew ? t('goal.new') : g.title,
     [
-      { key: 'title', label: 'На что копим', required: true, placeholder: 'Например, Подушка безопасности или Ноутбук' },
-      { key: 'target', label: `Сумма, ${state.data.settings.currency}`, type: 'number', required: true, half: true },
-      { key: 'deadline', label: 'К какой дате', type: 'date', half: true },
+      { key: 'title', label: t('goal.what'), required: true, placeholder: t('goal.whatPh') },
+      { key: 'target', label: t('common.amountCur', { cur: state.data.settings.currency }), type: 'number', required: true, half: true },
+      { key: 'deadline', label: t('goal.deadline'), type: 'date', half: true },
     ],
     { title: '', target: '', deadline: '', ...g },
     {
@@ -217,10 +225,10 @@ function goalModal(g) {
 
 function contributeModal(g) {
   formModal(
-    `Пополнить: ${g.title}`,
+    t('goal.contributeTo', { title: g.title }),
     [
-      { key: 'amount', label: `Сумма, ${state.data.settings.currency} (минус — снять)`, type: 'number', required: true, half: true },
-      { key: 'date', label: 'Дата', type: 'date', half: true },
+      { key: 'amount', label: t('goal.amountHint', { cur: state.data.settings.currency }), type: 'number', required: true, half: true },
+      { key: 'date', label: t('common.date'), type: 'date', half: true },
     ],
     { amount: '', date: today() },
     {
@@ -235,9 +243,9 @@ function contributeModal(g) {
 export function goalsTab() {
   const goals = state.data.goals;
   return page(
-    'Финансы',
-    'Цели накоплений',
-    h('button', { class: 'btn primary', onclick: () => goalModal(null) }, icon('plus', 16), 'Цель'),
+    t('nav.finance'),
+    t('goal.sub'),
+    h('button', { class: 'btn primary', onclick: () => goalModal(null) }, icon('plus', 16), t('goal.add')),
     goals.length
       ? h(
           'div',
@@ -246,29 +254,29 @@ export function goalsTab() {
             const p = goalPlan(g, today());
             return card(
               g.title,
-              h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: () => contributeModal(g) }, icon('plus', 14), 'Пополнить'), h('button', { class: 'btn ghost sm icon-only', title: 'Изменить', onclick: () => goalModal(g) }, icon('edit', 15))),
+              h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: () => contributeModal(g) }, icon('plus', 14), t('goal.contribute')), h('button', { class: 'btn ghost sm icon-only', title: t('common.edit'), onclick: () => goalModal(g) }, icon('edit', 15))),
               h('div', { class: 'stat-value' }, `${money(p.saved)}`),
-              h('div', { class: 'muted', style: { marginBottom: '10px' } }, `из ${money(g.target)} · ${Math.round(p.share * 100)}%`),
+              h('div', { class: 'muted', style: { marginBottom: '10px' } }, `${t('common.ofAmount', { amount: money(g.target) })} · ${Math.round(p.share * 100)}%`),
               h('div', { class: 'bar-track', style: { height: '10px' } }, h('div', { class: 'bar-fill', style: { width: `${p.share * 100}%` } })),
               h(
                 'p',
                 { class: 'muted', style: { margin: '10px 0 0' } },
                 p.done
-                  ? 'Цель достигнута 🎉'
+                  ? t('goal.done')
                   : p.perMonth != null
-                    ? `Чтобы успеть к ${prettyDate(g.deadline)}, откладывай ${money(p.perMonth)} в месяц (осталось ${money(p.left)}).`
-                    : `Осталось ${money(p.left)}. Укажи дату — посчитаю, сколько откладывать в месяц.`,
+                    ? t('goal.plan', { date: prettyDate(g.deadline), perMonth: money(p.perMonth), left: money(p.left) })
+                    : t('goal.noDate', { left: money(p.left) }),
               ),
             );
           }),
         )
-      : card(null, null, empty('Целей пока нет. Например: «Подушка безопасности — 1500 € к лету» или «Новый ноутбук для проектов».')),
+      : card(null, null, empty(t('goal.empty'))),
     goals.length > 0 &&
       h(
         'div',
         { style: { marginTop: '16px' } },
         card(
-          'Сводка',
+          t('goal.summary'),
           null,
           barList(
             goals.map((g) => {

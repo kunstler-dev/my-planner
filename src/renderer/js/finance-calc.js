@@ -5,6 +5,30 @@ export const DEFAULT_CATEGORIES = {
   expense: ['Еда', 'Транспорт', 'Жильё', 'Связь и подписки', 'Реклама канала', 'Развлечения', 'Игры', 'Учёба и курсы', 'Одежда', 'Здоровье', 'Другое'],
 };
 
+// Standard categories are stored by their Russian name (the key for budgets, rules and MCC) and shown translated.
+export const CATEGORY_KEYS = {
+  Зарплата: 'salary',
+  Фриланс: 'freelance',
+  'Реклама в канале': 'adsIncome',
+  Продажи: 'sales',
+  'Kindergeld / пособия': 'benefits',
+  Подарок: 'gift',
+  Еда: 'food',
+  Транспорт: 'transport',
+  Жильё: 'housing',
+  'Связь и подписки': 'subscriptions',
+  'Реклама канала': 'adsExpense',
+  Развлечения: 'fun',
+  Игры: 'games',
+  'Учёба и курсы': 'education',
+  Одежда: 'clothes',
+  Здоровье: 'health',
+  Другое: 'other',
+};
+
+/** Stored value of a standard category by its key: CAT.other → 'Другое'. */
+export const CAT = Object.fromEntries(Object.entries(CATEGORY_KEYS).map(([name, key]) => [key, name]));
+
 const num = (v) => Number(v) || 0;
 
 export function totals(entries) {
@@ -47,14 +71,18 @@ export function dailyAverage(entries, key, todayStr) {
   return totals(inMonth(entries, key)).expense / Math.max(1, days);
 }
 
-export function toCSV(entries) {
+const CSV_RU = { headers: ['Дата', 'Тип', 'Категория', 'Сумма', 'Комментарий'], income: 'Доход', expense: 'Расход', category: (c) => c };
+
+/** Semicolon CSV for Excel; `labels` gives headers, type names and category names in the interface language. */
+export function toCSV(entries, labels = {}) {
+  const L = { ...CSV_RU, ...labels };
   const esc = (v) => {
     const s = String(v ?? '');
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const rows = [['Дата', 'Тип', 'Категория', 'Сумма', 'Комментарий']];
+  const rows = [L.headers];
   for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date))) {
-    rows.push([e.date, e.type === 'income' ? 'Доход' : 'Расход', e.category, String(num(e.amount)).replace('.', ','), e.note]);
+    rows.push([e.date, e.type === 'income' ? L.income : L.expense, L.category(e.category), String(num(e.amount)).replace('.', ','), e.note]);
   }
   return rows.map((r) => r.map(esc).join(';')).join('\n');
 }

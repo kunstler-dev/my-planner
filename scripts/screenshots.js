@@ -1,5 +1,5 @@
 // Dev check: starts the app on a temp data folder with demo data, opens every section in light and dark
-// theme and saves screenshots. Usage: npx electron scripts/screenshots.js <outDir> [ch1,ch2]
+// theme and saves screenshots. Usage: npx electron scripts/screenshots.js <outDir> [ch1,ch2] [ru|uk|de]
 const { app, BrowserWindow } = require('electron');
 const fs = require('fs');
 const os = require('os');
@@ -7,8 +7,10 @@ const path = require('path');
 
 const out = path.resolve(process.argv[2] || 'shots');
 const channels = (process.argv[3] || 'durov').split(',');
+const lang = ['ru', 'uk', 'de'].includes(process.argv[4]) ? process.argv[4] : 'ru';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'planner-shots-'));
 process.env.PLANNER_DATA_DIR = dataDir;
+process.env.PLANNER_SILENT = '1';
 // Optional background / banner files: PLANNER_SHOT_BG and PLANNER_SHOT_BANNER (copied like the settings buttons do).
 for (const [kind, env] of [
   ['background', 'PLANNER_SHOT_BG'],
@@ -109,7 +111,7 @@ function demoData() {
     ],
   };
   finance.push({ id: 'pf1', type: 'income', amount: 300, category: 'Продажи', date: day(3), note: 'Заказ', projectId: 'pr1' });
-  return { ...v3, version: 1, settings: { theme: 'light', currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
+  return { ...v3, version: 1, settings: { theme: 'light', lang, currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
     { role: 'user', content: 'Посмотри на мои финансы и скажи, где я теряю деньги.' },
     { role: 'assistant', content: '### Коротко\nТы откладываешь **~40%** дохода — это хорошо.\n\n- Реклама канала: 5 тыс. ₽/мес — проверь окупаемость закупов\n- Еда: можно срезать 10–15%\n\n1. Заведи лимит на развлечения\n2. Считай цену подписчика с каждого закупа' },
   ] };
@@ -137,7 +139,7 @@ app.on('browser-window-created', (_e, win) => {
       log('timeout waiting for', expr, '| main:', (await js("document.querySelector('main').innerText.slice(0, 300)")).replace(/s+/g, ' '), '| toast:', await js("document.getElementById('toast')?.textContent"));
       return false;
     };
-    const click = (text) => js(`[...document.querySelectorAll('.nav-item')].find(b => b.textContent.trim() === ${JSON.stringify(text)})?.click()`);
+    const click = (view) => js(`document.querySelector('.nav-item[data-view=${JSON.stringify(view)}]')?.click()`);
     const shot = async (name) => {
       log('shot', name);
       await wait(900);
@@ -150,54 +152,55 @@ app.on('browser-window-created', (_e, win) => {
       log('start');
       await js(`window.api.grok.setKey('xai-demo-key')`);
       const submitInput = (value) => js(`(() => { const i = document.querySelector('main form input'); i.value = ${JSON.stringify(value)}; i.form.requestSubmit(); })()`);
-      await click('Telegram-каналы');
+      await click('channel');
       for (const [i, ch] of channels.entries()) {
-        if (i) await js(`[...document.querySelectorAll('main .btn')].find(b => b.textContent.trim() === 'Канал').click()`);
+        if (i) await js(`[...document.querySelectorAll('main .btn.sm')].at(-1).click()`);
         await until(`!!document.querySelector('main form input')`);
         await submitInput(ch);
         await until(`document.querySelectorAll('main .stat-value').length > 0 && !document.querySelector('main form input')`, 30000);
         log('channel added', ch);
       }
       for (const theme of ['light', 'dark']) {
-        if (theme === 'dark') await click('Тёмная тема');
-        const tab = (label) => js(`[...document.querySelectorAll('main .seg button')].find(b => b.textContent === ${JSON.stringify(label)})?.click()`);
+        if (theme === 'dark') await js(`document.querySelector('.nav-item[data-action=theme]').click()`);
+        const tab = (key) => js(`document.querySelector('main .seg button[data-tab=${JSON.stringify(key)}]')?.click()`);
+        // [view, tabs to shoot; the last one switches back to the first tab]
         const views = [
-          ['Главная', 'home'],
-          ['Финансы', 'finance', ['Бюджеты', 'Регулярные платежи', 'Цели', 'Операции']],
-          ['Счета', 'accounts'],
-          ['Карьера', 'career'],
-          ['Проекты', 'projects'],
-          ['Telegram-каналы', 'channel', ['Контент-план', 'Реклама', 'Аналитика']],
-          ['Задачи и привычки', 'tasks'],
-          ['Заметки', 'notes'],
-          ['Игры', 'games', ['Ранги', 'Контент', 'Вишлист Steam']],
-          ['Grok', 'grok'],
-          ['Настройки', 'settings'],
+          ['home'],
+          ['finance', ['budgets', 'recurring', 'goals', 'ops']],
+          ['accounts'],
+          ['career'],
+          ['projects'],
+          ['channel', ['plan', 'ads', 'stats']],
+          ['tasks'],
+          ['notes'],
+          ['games', ['ranks', 'clips', 'wishlist']],
+          ['grok'],
+          ['settings'],
         ];
-        for (const [view, name, tabs] of views) {
+        for (const [name, tabs] of views) {
           if (theme === 'dark' && !['home', 'finance', 'career', 'games', 'settings'].includes(name)) continue;
-          await click(view);
+          await click(name);
           if (name === 'grok') await wait(6000);
           await shot(`${name}-${theme}`);
+          if (name === 'settings') {
+            await js(`document.getElementById('main').scrollTop = 1e6`);
+            await shot(`settings-bottom-${theme}`);
+          }
           for (const t of (theme === 'light' && tabs) || []) {
-            if (t === tabs.at(-1)) {
-              await tab(t);
-              continue;
-            }
             await tab(t);
-            await shot(`${name}-${t.split(' ')[0].toLowerCase()}-${theme}`);
+            if (t !== tabs.at(-1)) await shot(`${name}-${t}-${theme}`);
           }
         }
         if (theme === 'light') {
-          await click('Grok');
-          await js(`[...document.querySelectorAll('main .chip')].find(b => b.textContent === 'Разбор денег')?.click()`);
+          await click('grok');
+          await js(`document.querySelector('main .chip[data-quick=money]')?.click()`);
           await wait(8000);
           log('grok toast:', await js("document.getElementById('toast')?.textContent"));
           await shot('grok-filled-light');
         }
       }
-      await click('Финансы');
-      await js(`[...document.querySelectorAll('main .btn')].find(b => b.textContent.includes('Расход')).click()`);
+      await click('finance');
+      await js(`document.querySelector('main .page-head .btn.primary').click()`);
       await shot('finance-modal');
       fs.writeFileSync(path.join(out, 'errors.txt'), errors.join('\n'));
     } catch (err) {

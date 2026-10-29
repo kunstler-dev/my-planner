@@ -1,28 +1,20 @@
 // Grok tab, two modes: 'web' — grok.com inside the app with the user's own subscription (no API costs);
 // 'api' — chat through the xAI API with a key (paid per token), the key lives encrypted in the main process.
+// Prompts and the system message are in the interface language, so Grok answers in it too.
 import { state, update, save } from '../state.js';
 import { h, icon, card, toast, uid, money } from '../ui.js';
+import { t } from '../i18n.js';
 import { markdown } from '../markdown.js';
 import { today, thisMonth, shiftMonth, monthTitle } from '../dates.js';
 import { totals, inMonth, byCategory } from '../finance-calc.js';
 import { summaryForAI } from '../tg.js';
 import { careerStats, projectStats, netWorth } from '../planner-calc.js';
+import { catLabel, accountName } from '../labels.js';
 import { go } from '../app.js';
 import { showGrokWeb, fillGrokWeb, grokWeb } from '../grok-web.js';
 
-const ERRORS = {
-  no_key: 'Не задан ключ xAI API. Добавь его в Настройках.',
-  bad_key: 'Ключ xAI не подошёл (401/403). Проверь его в Настройках.',
-  rate_limit: 'Лимит запросов или кредитов xAI исчерпан. Попробуй позже или пополни баланс на console.x.ai.',
-  model: 'Модель не найдена. Выбери другую в Настройках (кнопка «Загрузить список моделей»).',
-  network: 'Нет связи с api.x.ai. Проверь интернет или VPN.',
-  http: 'Ошибка xAI API.',
-};
-
-const SYSTEM =
-  'Ты — Grok, личный помощник в приложении-планере. Отвечай по-русски, по делу и конкретно, без воды. ' +
-  'Пользователь живёт в Германии, ищет Ausbildung и работу, ведёт учёт денег, развивает свои Telegram-каналы и хочет зарабатывать на своих приложениях и проектах. Когда даёшь советы — опирайся на цифры, ' +
-  'которые он прислал, и предлагай конкретные шаги. Форматируй ответы коротким Markdown (заголовки, списки).';
+const ERROR_CODES = ['no_key', 'bad_key', 'rate_limit', 'model', 'network', 'http'];
+const errorText = (code) => t(`grok.error.${ERROR_CODES.includes(code) ? code : 'http'}`);
 
 let hasKey = null;
 let busy = null; // { id, el, text }
@@ -32,16 +24,16 @@ function financeSummary() {
   const m = thisMonth();
   const lines = [];
   for (const key of [shiftMonth(m, -2), shiftMonth(m, -1), m]) {
-    const t = totals(inMonth(all, key));
-    lines.push(`${monthTitle(key)}: доходы ${money(t.income)}, расходы ${money(t.expense)}, итог ${money(t.net, { sign: true })}`);
+    const tot = totals(inMonth(all, key));
+    lines.push(t('ai.fin.month', { month: monthTitle(key), income: money(tot.income), expense: money(tot.expense), net: money(tot.net, { sign: true }) }));
   }
   const cats = byCategory(inMonth(all, m), 'expense')
-    .map((c) => `${c.category} — ${money(c.sum)} (${Math.round(c.share * 100)}%)`)
+    .map((c) => `${catLabel(c.category)} — ${money(c.sum)} (${Math.round(c.share * 100)}%)`)
     .join('; ');
   const inc = byCategory(inMonth(all, m), 'income')
-    .map((c) => `${c.category} — ${money(c.sum)}`)
+    .map((c) => `${catLabel(c.category)} — ${money(c.sum)}`)
     .join('; ');
-  return `${lines.join('\n')}\nРасходы этого месяца по категориям: ${cats || 'нет'}\nДоходы этого месяца по категориям: ${inc || 'нет'}\nСегодня ${today()}.`;
+  return [...lines, t('ai.fin.expenseCats', { list: cats || t('ai.none') }), t('ai.fin.incomeCats', { list: inc || t('ai.none') }), t('ai.fin.today', { date: today() })].join('\n');
 }
 
 function channelsSummary() {
@@ -49,56 +41,37 @@ function channelsSummary() {
 }
 
 const QUICK = [
-  ['Разбор моих финансов', () => `Посмотри на мои финансы и скажи, где я теряю деньги и что можно урезать. Дай 3–5 конкретных советов.\n\n${financeSummary()}`],
+  ['finances', () => `${t('prompt.q.finances')}\n\n${financeSummary()}`],
+  ['channels', () => (state.data.channels.length ? `${t('prompt.q.channels', { extra: state.data.channels.length > 1 ? t('prompt.q.channelsExtra') : '' })}\n\n${channelsSummary()}` : null)],
+  ['posts', () => (state.data.channels.length ? `${t('prompt.q.posts')}\n\n${channelsSummary()}` : t('prompt.q.postsNoChannel'))],
   [
-    'Разбор каналов',
-    () =>
-      state.data.channels.length
-        ? `Разбери мои Telegram-каналы: сильные и слабые стороны каждого, лучшее время для постов, 5 шагов для роста${state.data.channels.length > 1 ? ' и как каналам помогать друг другу' : ''}.\n\n${channelsSummary()}`
-        : null,
-  ],
-  [
-    'Идеи для постов',
-    () =>
-      state.data.channels.length
-        ? `Предложи по 7 идей для постов на ближайшие две недели для каждого моего канала, в их стиле. Учитывай, какие посты набрали больше охвата.\n\n${channelsSummary()}`
-        : 'Предложи 10 идей для постов в Telegram-канал. Сначала спроси меня, о чём канал, если это непонятно.',
-  ],
-  [
-    'Поиск Ausbildung',
+    'ausbildung',
     () => {
       const apps = state.data.career.applications;
       const st = careerStats(apps, today());
-      const list = apps.map((a) => `- ${a.company}: ${a.position} (${a.kind}), статус ${a.status}${a.sentAt ? `, отправлено ${a.sentAt}` : ''}`).join('\n');
-      return (
-        'Я ищу Ausbildung/работу в Германии. Помоги с планом поиска: какие профессии мне подходят и востребованы, где искать, как улучшить Bewerbung, ' +
-        `что делать на этой неделе. Сейчас: отправлено ${st.sent}, на этой неделе ${st.week}, отвечают ${Math.round(st.responseRate * 100)}%, собеседований ${st.interviews}.\n${list || 'Откликов пока нет.'}\nСначала спроси, что мне интересно и какой у меня уровень немецкого.`
-      );
+      const list = apps.map((a) => `- ${a.company}: ${a.position} (${a.kind}), ${t('ai.status')} ${a.status}${a.sentAt ? `, ${t('ai.sent')} ${a.sentAt}` : ''}`).join('\n');
+      return t('prompt.q.ausbildung', { sent: st.sent, week: st.week, reply: Math.round(st.responseRate * 100), interviews: st.interviews, list: list || t('prompt.q.noApps') });
     },
   ],
   [
-    'Заработок на проектах',
+    'projects',
     () => {
       const ps = state.data.projects.map((p) => {
         const st = projectStats(p, state.data.finance);
-        return `- ${p.name} (${p.status}): ${p.description || ''}; прибыль ${money(st.profit)}, часов ${st.hours}; монетизация: ${p.money || 'нет'}`;
+        return t('ai.project', { name: p.name, status: p.status, description: p.description || '', profit: money(st.profit), hours: st.hours, money: p.money || t('ai.none') });
       });
-      return (
-        'Хочу зарабатывать на своих приложениях и проектах, параллельно с поиском Ausbildung в Германии. ' +
-        `Мои проекты:\n${ps.join('\n') || '(пока не внёс — спроси меня)'}\n` +
-        'Предложи, на чём сфокусироваться, 5 реалистичных способов монетизации, как оформить доход в Германии (Kleingewerbe, налоги, что можно на Ausbildung) и план на месяц.'
-      );
+      return t('prompt.q.projects', { list: ps.join('\n') || t('prompt.q.noProjects') });
     },
   ],
   [
-    'Разбор денег',
+    'money',
     () => {
       const { accounts, rates, settings } = state.data;
       const nw = netWorth(accounts, rates, settings.currency);
-      return `Вот где лежат мои деньги:\n${accounts.map((a) => `- ${a.name}: ${a.balance} ${a.currency}`).join('\n')}\nВсего ≈ ${money(nw.total)}.\n${financeSummary()}\nСкажи, как лучше распределить деньги между картами и криптой, какую подушку держать и сколько откладывать. Без инвестиционных обещаний.`;
+      return t('prompt.q.money', { list: accounts.map((a) => `- ${accountName(a)}: ${a.balance} ${a.currency}`).join('\n'), total: money(nw.total), finance: financeSummary() });
     },
   ],
-  ['План на неделю', () => 'Помоги составить план на неделю: спроси, какие у меня цели и дела, и разложи их по дням.'],
+  ['week', () => t('prompt.q.week')],
 ];
 
 function messageEl(m, i) {
@@ -117,10 +90,10 @@ function messageEl(m, i) {
           class: 'btn ghost sm',
           onclick: () => {
             navigator.clipboard.writeText(m.content);
-            toast('Скопировано');
+            toast(t('grok.copied'));
           },
         },
-        'Копировать',
+        t('grok.copy'),
       ),
       i === state.data.chat.length - 1 &&
         h(
@@ -133,7 +106,7 @@ function messageEl(m, i) {
             },
           },
           icon('refresh', 14),
-          'Ещё раз',
+          t('grok.again'),
         ),
     ),
   );
@@ -156,7 +129,7 @@ async function send(text) {
       scrollDown();
     }
   });
-  const res = await window.api.grok.chat(id, state.data.settings.grokModel, [{ role: 'system', content: SYSTEM }, ...history]);
+  const res = await window.api.grok.chat(id, state.data.settings.grokModel, [{ role: 'system', content: t('grok.system') }, ...history]);
   off();
   const partial = busy.text;
   busy = null;
@@ -165,7 +138,7 @@ async function send(text) {
       if (res.ok && (res.text || partial)) d.chat.push({ role: 'assistant', content: res.text || partial });
       else if (!res.ok) {
         if (partial) d.chat.push({ role: 'assistant', content: partial });
-        d.chat.push({ role: 'error', content: `${ERRORS[res.code] || ERRORS.http}${res.message && res.code !== 'no_key' ? `\n${String(res.message).slice(0, 300)}` : ''}` });
+        d.chat.push({ role: 'error', content: `${errorText(res.code)}${res.message && res.code !== 'no_key' ? `\n${String(res.message).slice(0, 300)}` : ''}` });
       }
     },
     { silent: true },
@@ -178,6 +151,30 @@ function scrollDown() {
   if (log) log.scrollTop = log.scrollHeight;
 }
 
+/** Quick prompt chips; `use(prompt)` sends, pastes or opens the prompt depending on the mode. */
+function quickChips(use, title) {
+  return h(
+    'div',
+    { class: 'chips' },
+    QUICK.map(([key, make]) =>
+      h(
+        'button',
+        {
+          class: 'chip',
+          title,
+          'data-quick': key,
+          onclick: () => {
+            const p = make();
+            if (!p) return toast(t('grok.needChannel'));
+            use(p);
+          },
+        },
+        t(`grok.quick.${key}`),
+      ),
+    ),
+  );
+}
+
 function renderLog() {
   const log = document.getElementById('grok-log');
   if (!log) return;
@@ -185,31 +182,16 @@ function renderLog() {
   const items = chat.map(messageEl);
   if (busy) items.push(h('div', { class: 'msg assistant' }, h('div', { id: 'grok-live', class: 'cursor', html: markdown(busy.text) })));
   if (!chat.length && !busy) {
+    const chips = quickChips(send);
+    chips.style.justifyContent = 'center';
     items.push(
       h(
         'div',
         { class: 'stack', style: { margin: 'auto', alignItems: 'center', textAlign: 'center', maxWidth: '520px' } },
         h('div', { class: 'brand-mark', style: { width: '44px', height: '44px', borderRadius: '14px', fontSize: '20px' } }, icon('spark', 22)),
-        h('h2', {}, 'Чем помочь?'),
-        h('p', { class: 'muted', style: { margin: 0 } }, 'Спроси что угодно или выбери быстрый запрос — Grok получит цифры из твоих финансов и канала.'),
-        h(
-          'div',
-          { class: 'chips', style: { justifyContent: 'center' } },
-          QUICK.map(([label, make]) =>
-            h(
-              'button',
-              {
-                class: 'chip',
-                onclick: () => {
-                  const p = make();
-                  if (!p) return toast('Сначала подключи канал во вкладке «Telegram-каналы»');
-                  send(p);
-                },
-              },
-              label,
-            ),
-          ),
-        ),
+        h('h2', {}, t('grok.howHelp')),
+        h('p', { class: 'muted', style: { margin: 0 } }, t('grok.howHelpHint')),
+        chips,
       ),
     );
   }
@@ -224,15 +206,9 @@ function renderLog() {
 function keyCard() {
   const input = h('input', { class: 'input', type: 'password', placeholder: 'xai-…', style: { flex: 1 } });
   return card(
-    'Подключить Grok',
+    t('grok.connect'),
     null,
-    h(
-      'p',
-      { class: 'muted', style: { marginTop: 0 } },
-      'Нужен ключ xAI API: зайди на ',
-      h('a', { href: 'https://console.x.ai', target: '_blank', style: { color: 'inherit' } }, 'console.x.ai'),
-      ' → API Keys → Create API key. Запросы оплачиваются с баланса xAI по их тарифам. Ключ хранится только на этом компьютере в зашифрованном виде.',
-    ),
+    h('p', { class: 'muted', style: { marginTop: 0 } }, t('grok.keyHint1'), h('a', { href: 'https://console.x.ai', target: '_blank', style: { color: 'inherit' } }, 'console.x.ai'), t('grok.keyHint2')),
     h(
       'form',
       {
@@ -241,21 +217,17 @@ function keyCard() {
           e.preventDefault();
           if (!input.value.trim()) return;
           hasKey = await window.api.grok.setKey(input.value.trim());
-          toast('Ключ сохранён');
+          toast(t('settings.keySaved'));
           update(() => {});
         },
       },
       input,
-      h('button', { class: 'btn primary', type: 'submit' }, 'Сохранить'),
+      h('button', { class: 'btn primary', type: 'submit' }, t('common.save')),
     ),
   );
 }
 
-const MODES = [
-  ['web', 'Внутри приложения'],
-  ['browser', 'В браузере'],
-  ['api', 'API-ключ'],
-];
+const MODES = ['web', 'browser', 'api'];
 
 // Windows can't hand very long links to the browser; longer prompts go through the clipboard instead.
 const MAX_LINK = 2000;
@@ -267,10 +239,10 @@ export function openGrokInBrowser(text) {
   const url = `https://grok.com/?q=${encodeURIComponent(text)}`;
   if (url.length <= MAX_LINK) {
     window.open(url, '_blank');
-    toast('Открыл Grok в браузере — подтверди отправку там');
+    toast(t('grok.openedBrowser'));
   } else {
     window.open('https://grok.com/', '_blank');
-    toast('Запрос длинный — он скопирован, вставь его в Grok через Ctrl+V');
+    toast(t('grok.longCopied'));
   }
 }
 
@@ -279,16 +251,16 @@ function modeSeg() {
   return h(
     'div',
     { class: 'seg' },
-    MODES.map(([k, label]) => h('button', { class: mode === k ? 'on' : '', onclick: () => update((d) => (d.settings.grokMode = k)) }, label)),
+    MODES.map((k) => h('button', { class: mode === k ? 'on' : '', onclick: () => update((d) => (d.settings.grokMode = k)) }, t(`grok.mode.${k}`))),
   );
 }
 
 /** Puts a prompt into grok.com (subscription mode); copies it to the clipboard as a fallback. */
 export async function sendToGrokWeb(text) {
   navigator.clipboard.writeText(text).catch(() => {});
-  toast('Вставляю запрос в Grok…');
+  toast(t('grok.pasting'));
   const ok = await fillGrokWeb(text);
-  toast(ok ? 'Запрос вставлен — проверь и нажми Enter в Grok' : 'Не нашёл поле ввода — запрос скопирован, вставь его через Ctrl+V');
+  toast(ok ? t('grok.pasted') : t('grok.pasteFailed'));
 }
 
 function browserPage(pending) {
@@ -296,29 +268,12 @@ function browserPage(pending) {
   return h(
     'div',
     { class: 'page' },
-    h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Grok'), h('div', { class: 'sub' }, 'Grok открывается в твоём браузере — там, где ты уже вошёл (через Google, GitHub, X)')), modeSeg()),
+    h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Grok'), h('div', { class: 'sub' }, t('grok.browserSub'))), modeSeg()),
     card(
-      'Быстрые запросы',
-      h('button', { class: 'btn primary', onclick: () => openGrokInBrowser(null) }, icon('up', 16), 'Открыть grok.com'),
-      h('p', { class: 'muted', style: { marginTop: 0 } }, 'Запрос с твоими цифрами откроется в браузере уже вписанным — останется подтвердить отправку. Длинный запрос копируется в буфер, его вставляешь через Ctrl+V.'),
-      h(
-        'div',
-        { class: 'chips' },
-        QUICK.map(([label, make]) =>
-          h(
-            'button',
-            {
-              class: 'chip',
-              onclick: () => {
-                const p = make();
-                if (!p) return toast('Сначала подключи канал во вкладке «Telegram-каналы»');
-                openGrokInBrowser(p);
-              },
-            },
-            label,
-          ),
-        ),
-      ),
+      t('grok.quickTitle'),
+      h('button', { class: 'btn primary', onclick: () => openGrokInBrowser(null) }, icon('up', 16), t('grok.openSite')),
+      h('p', { class: 'muted', style: { marginTop: 0 } }, t('grok.browserHint')),
+      quickChips(openGrokInBrowser),
     ),
   );
 }
@@ -333,49 +288,26 @@ function webPage(pending) {
   return h(
     'div',
     { class: 'page page-wide' },
-    h(
-      'div',
-      { class: 'page-head', style: { marginBottom: '14px' } },
-      h('div', {}, h('h1', {}, 'Grok'), h('div', { class: 'sub' }, 'Твоя подписка на grok.com — без оплаты за токены. Войди один раз, вход сохранится.')),
-      modeSeg(),
-    ),
+    h('div', { class: 'page-head', style: { marginBottom: '14px' } }, h('div', {}, h('h1', {}, 'Grok'), h('div', { class: 'sub' }, t('grok.webSub'))), modeSeg()),
     h(
       'div',
       { class: 'row', style: { marginBottom: '12px', flexWrap: 'wrap' } },
-      h(
-        'div',
-        { class: 'chips' },
-        QUICK.map(([label, make]) =>
-          h(
-            'button',
-            {
-              class: 'chip',
-              title: 'Вставить запрос с твоими цифрами в Grok',
-              onclick: () => {
-                const p = make();
-                if (!p) return toast('Сначала подключи канал во вкладке «Telegram-каналы»');
-                sendToGrokWeb(p);
-              },
-            },
-            label,
-          ),
-        ),
-      ),
+      quickChips(sendToGrokWeb, t('grok.pasteHint')),
       h('div', { class: 'spacer' }),
-      tool('left', 'Назад', grokWeb.back),
-      tool('refresh', 'Обновить страницу', grokWeb.reload),
-      tool('home', 'На главную grok.com', grokWeb.home),
+      tool('left', t('grok.back'), grokWeb.back),
+      tool('refresh', t('grok.reload'), grokWeb.reload),
+      tool('home', t('grok.home'), grokWeb.home),
       h(
         'button',
         {
           class: 'btn ghost sm',
           onclick: async () => {
-            if (!confirm('Выйти из аккаунта grok.com в планере?')) return;
+            if (!confirm(t('grok.logoutConfirm'))) return;
             await grokWeb.logout();
-            toast('Вышел из grok.com');
+            toast(t('grok.loggedOut'));
           },
         },
-        'Выйти',
+        t('grok.logout'),
       ),
     ),
     slot,
@@ -392,7 +324,7 @@ export function grokView() {
   const head = h(
     'div',
     { class: 'page-head' },
-    h('div', {}, h('h1', {}, 'Grok'), h('div', { class: 'sub' }, `Модель: ${state.data.settings.grokModel} · `, h('a', { href: '#', style: { color: 'inherit' }, onclick: (e) => (e.preventDefault(), go('settings')) }, 'сменить'))),
+    h('div', {}, h('h1', {}, 'Grok'), h('div', { class: 'sub' }, `${t('grok.model', { model: state.data.settings.grokModel })} · `, h('a', { href: '#', style: { color: 'inherit' }, onclick: (e) => (e.preventDefault(), go('settings')) }, t('grok.change')))),
     h(
       'div',
       { class: 'row' },
@@ -407,7 +339,7 @@ export function grokView() {
           },
         },
         icon('trash', 16),
-        'Очистить чат',
+        t('grok.clear'),
       ),
     ),
   );
@@ -431,7 +363,7 @@ export function grokView() {
   const input = h('textarea', {
     class: 'input',
     rows: 1,
-    placeholder: 'Напиши сообщение… (Enter — отправить, Shift+Enter — новая строка)',
+    placeholder: t('grok.inputPh'),
     oninput: (e) => {
       e.target.style.height = 'auto';
       e.target.style.height = `${Math.min(180, e.target.scrollHeight)}px`;
@@ -461,8 +393,8 @@ export function grokView() {
         'div',
         { class: 'chat-input' },
         input,
-        h('button', { class: 'btn primary', id: 'grok-send', onclick: submit }, icon('send', 16), 'Отправить'),
-        h('button', { class: 'btn', id: 'grok-stop', hidden: true, onclick: () => busy && window.api.grok.abort(busy.id) }, icon('stop', 16), 'Стоп'),
+        h('button', { class: 'btn primary', id: 'grok-send', onclick: submit }, icon('send', 16), t('grok.send')),
+        h('button', { class: 'btn', id: 'grok-stop', hidden: true, onclick: () => busy && window.api.grok.abort(busy.id) }, icon('stop', 16), t('grok.stop')),
       ),
     ),
   );

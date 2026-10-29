@@ -1,4 +1,6 @@
-// Dates are local 'YYYY-MM-DD' strings; months are 'YYYY-MM'.
+// Dates are local 'YYYY-MM-DD' strings; months are 'YYYY-MM'. Names of months and days follow the interface language.
+import { locale } from './i18n.js';
+
 const pad = (n) => String(n).padStart(2, '0');
 
 export function iso(d = new Date()) {
@@ -19,26 +21,29 @@ export function addDays(dateStr, delta) {
   return iso(new Date(y, m - 1, d + delta));
 }
 
-const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
-const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-export const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const dateOf = (dateStr) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d || 1);
+};
+
+/** Monday-first short weekday names in the interface language. */
+export function weekdays() {
+  return Array.from({ length: 7 }, (_, i) => cap(new Date(2024, 0, 1 + i).toLocaleDateString(locale(), { weekday: 'short' }).replace('.', '')));
+}
 
 export function monthTitle(key) {
-  const [y, m] = key.split('-').map(Number);
-  const name = MONTHS[m - 1];
-  return `${name[0].toUpperCase()}${name.slice(1)} ${y}`;
+  const d = dateOf(`${key}-01`);
+  return `${cap(d.toLocaleDateString(locale(), { month: 'long' }))} ${d.getFullYear()}`;
 }
-export const monthShort = (key) => MONTHS_SHORT[Number(key.slice(5, 7)) - 1];
+export const monthShort = (key) => dateOf(`${key}-01`).toLocaleDateString(locale(), { month: 'short' }).replace('.', '');
 
-export function prettyDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-}
+export const prettyDate = (dateStr) => dateOf(dateStr).toLocaleDateString(locale(), { day: 'numeric', month: 'long' });
 
-export function longToday() {
-  const s = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
-  return s[0].toUpperCase() + s.slice(1);
-}
+export const longToday = () => cap(new Date().toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }));
+
+/** Date and time for timestamps (fetchedAt, posts): «3 окт., 14:05». */
+export const dateTime = (ms) => new Date(ms).toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** Monday-first weekday index 0..6. */
 export const weekdayIdx = (d) => (d.getDay() + 6) % 7;

@@ -1,10 +1,10 @@
-// Boot, sidebar navigation and view switching.
+// Boot, sidebar navigation and view switching; the background scheduler, notifications and tray commands.
 import { state, loadState, setRenderer, update } from './state.js';
 import { h, icon, toast } from './ui.js';
+import { t, setLang, LANGS, mainStrings } from './i18n.js';
 import { petCorner } from './pets.js';
-import { today } from './dates.js';
 import { homeView } from './views/home.js';
-import { financeView } from './views/finance.js';
+import { financeView, entryModal } from './views/finance.js';
 import { syncRecurring } from './views/finance-extra.js';
 import { accountsView } from './views/accounts.js';
 import { channelView } from './views/channel.js';
@@ -15,21 +15,24 @@ import { notesView } from './views/notes.js';
 import { gamesView } from './views/games.js';
 import { grokView } from './views/grok.js';
 import { settingsView } from './views/settings.js';
+import { register, onDayChange, startScheduler } from './scheduler.js';
+import { checkNotifications } from './notifications.js';
+import { MINUTE } from './notify-calc.js';
 
 const VIEWS = {
-  home: { title: 'Главная', icon: 'home', render: homeView },
-  finance: { title: 'Финансы', icon: 'wallet', render: financeView },
-  accounts: { title: 'Счета', icon: 'card', render: accountsView },
-  career: { title: 'Карьера', icon: 'briefcase', render: careerView },
-  projects: { title: 'Проекты', icon: 'rocket', render: projectsView },
-  channel: { title: 'Telegram-каналы', icon: 'send', render: channelView },
-  tasks: { title: 'Задачи и привычки', icon: 'list', render: tasksView },
-  notes: { title: 'Заметки', icon: 'note', render: notesView },
-  games: { title: 'Игры', icon: 'gamepad', render: gamesView },
-  grok: { title: 'Grok', icon: 'spark', render: grokView },
-  settings: { title: 'Настройки', icon: 'gear', render: settingsView },
+  home: { icon: 'home', render: homeView },
+  finance: { icon: 'wallet', render: financeView },
+  accounts: { icon: 'card', render: accountsView },
+  career: { icon: 'briefcase', render: careerView },
+  projects: { icon: 'rocket', render: projectsView },
+  channel: { icon: 'send', render: channelView },
+  tasks: { icon: 'list', render: tasksView },
+  notes: { icon: 'note', render: notesView },
+  games: { icon: 'gamepad', render: gamesView },
+  grok: { icon: 'spark', render: grokView },
+  settings: { icon: 'gear', render: settingsView },
 };
-const NAV = [['home'], ['Деньги', 'finance', 'accounts'], ['Работа', 'career', 'projects', 'channel'], ['Личное', 'tasks', 'notes', 'games'], ['Помощник', 'grok']];
+const NAV = [['home'], ['money', 'finance', 'accounts'], ['work', 'career', 'projects', 'channel'], ['personal', 'tasks', 'notes', 'games'], ['assistant', 'grok']];
 
 export function go(view, opts) {
   state.view = view;
@@ -40,12 +43,7 @@ export function go(view, opts) {
 
 function navItem(key) {
   const v = VIEWS[key];
-  return h(
-    'button',
-    { class: `nav-item${state.view === key ? ' active' : ''}`, onclick: () => go(key) },
-    icon(v.icon),
-    v.title,
-  );
+  return h('button', { class: `nav-item${state.view === key ? ' active' : ''}`, 'data-view': key, onclick: () => go(key) }, icon(v.icon), t(`nav.${key}`));
 }
 
 function renderNav() {
@@ -53,17 +51,21 @@ function renderNav() {
   nav.replaceChildren(
     ...NAV.flatMap((group) => {
       const [first, ...rest] = group;
-      return VIEWS[first] ? group.map(navItem) : [h('div', { class: 'nav-group' }, first), ...rest.map(navItem)];
+      return VIEWS[first] ? group.map(navItem) : [h('div', { class: 'nav-group' }, t(`nav.group.${first}`)), ...rest.map(navItem)];
     }),
   );
-  const dark = state.data.settings.theme === 'dark';
+  const s = state.data.settings;
+  const dark = s.theme === 'dark';
+  const nextLang = LANGS[(LANGS.indexOf(s.lang) + 1) % LANGS.length];
   document.getElementById('nav-bottom').replaceChildren(
     navItem('settings'),
+    h('button', { class: 'nav-item', 'data-action': 'theme', onclick: () => setTheme(dark ? 'light' : 'dark') }, icon(dark ? 'sun' : 'moon'), dark ? t('nav.lightTheme') : t('nav.darkTheme')),
     h(
       'button',
-      { class: 'nav-item', onclick: () => setTheme(dark ? 'light' : 'dark') },
-      icon(dark ? 'sun' : 'moon'),
-      dark ? 'Светлая тема' : 'Тёмная тема',
+      { class: 'nav-item', 'data-action': 'lang', title: t('nav.langHint'), onclick: () => setLanguage(nextLang) },
+      icon('globe'),
+      t('nav.language'),
+      h('span', { class: 'nav-lang' }, s.lang.toUpperCase()),
     ),
   );
   const slot = document.getElementById('pets-slot');
@@ -75,6 +77,18 @@ export function setTheme(theme) {
   update((d) => (d.settings.theme = theme), { silent: true });
   applyTheme();
   render();
+}
+
+/** Switches the interface language at once, including the tray menu and system dialogs. */
+export function setLanguage(lang) {
+  update((d) => (d.settings.lang = lang), { silent: true });
+  applyLang();
+  render();
+}
+
+function applyLang() {
+  setLang(state.data.settings.lang);
+  window.api.setStrings(mainStrings());
 }
 
 function applyTheme() {
@@ -130,17 +144,22 @@ async function adoptMedia() {
   }
 }
 
-// Recurring payments are written once per day (on start, and when the app stays open past midnight).
-let recurringChecked = '';
+// Recurring payments are written once per day: on start and when the date changes with the app open.
 function checkRecurring() {
-  if (recurringChecked === today()) return;
-  recurringChecked = today();
   const n = syncRecurring();
-  if (n) toast(`Записаны регулярные платежи: ${n}`);
+  if (n) {
+    toast(t('finance.recurringWritten', { n }));
+    render();
+  }
+}
+
+/** Tray menu and notification clicks. */
+function onCommand(msg) {
+  if (msg?.cmd === 'go' && VIEWS[msg.view]) go(msg.view);
+  else if (msg?.cmd === 'expense' || msg?.cmd === 'income') entryModal({ type: msg.cmd });
 }
 
 function render() {
-  checkRecurring();
   applyMedia();
   renderNav();
   const main = document.getElementById('main');
@@ -152,10 +171,15 @@ function render() {
 
 async function boot() {
   await loadState();
+  applyLang();
   await adoptMedia();
   applyTheme();
   setRenderer(render);
+  window.api.onCommand(onCommand);
+  onDayChange(checkRecurring);
+  register('notify', MINUTE, () => checkNotifications());
   render();
+  startScheduler();
 }
 
 boot();

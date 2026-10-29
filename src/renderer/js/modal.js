@@ -1,7 +1,8 @@
 // Modal dialogs: openModal() for custom content and formModal() for simple record editors.
 import { h, icon } from './ui.js';
+import { t } from './i18n.js';
 
-export function openModal(title, body, { onSubmit, submitText = 'Сохранить', danger } = {}) {
+export function openModal(title, body, { onSubmit, submitText = t('common.save'), danger } = {}) {
   const close = () => {
     back.remove();
     document.removeEventListener('keydown', onKey);
@@ -25,7 +26,7 @@ export function openModal(title, body, { onSubmit, submitText = 'Сохрани�
       { class: 'row' },
       danger,
       h('div', { class: 'spacer' }),
-      h('button', { type: 'button', class: 'btn ghost', onclick: close }, 'Отмена'),
+      h('button', { type: 'button', class: 'btn ghost', onclick: close }, t('common.cancel')),
       onSubmit && h('button', { type: 'submit', class: 'btn primary' }, submitText),
     ),
   );
@@ -39,7 +40,7 @@ export function openModal(title, body, { onSubmit, submitText = 'Сохрани�
 /**
  * Record editor. fields: [{ key, label, type: 'text'|'number'|'date'|'select'|'textarea'|'checkbox',
  * options: [[value, label]], placeholder, required, half, list: [suggestions] }].
- * onSave(values) may return false to keep the dialog open; onDelete adds a «Удалить» button.
+ * onSave(values) may return false to keep the dialog open; onDelete adds a delete button.
  */
 export function formModal(title, fields, values, { onSave, onDelete, submitText } = {}) {
   const inputs = {};
@@ -124,7 +125,7 @@ export function formModal(title, fields, values, { onSave, onDelete, submitText 
           },
         },
         icon('trash', 16),
-        'Удалить',
+        t('common.delete'),
       ),
   });
   return modal;

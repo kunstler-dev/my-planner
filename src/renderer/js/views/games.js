@@ -2,16 +2,19 @@
 // pipeline for game clips (TikTok / Shorts / YouTube) with views.
 import { state, update, rerender } from '../state.js';
 import { h, icon, money, compact, uid, card, empty, toast } from '../ui.js';
+import { t, num, locale } from '../i18n.js';
 import { openModal, formModal } from '../modal.js';
 import { lineChart } from '../charts.js';
 import { today, prettyDate } from '../dates.js';
 import { convert } from '../planner-calc.js';
+import { CAT } from '../finance-calc.js';
 import {
   parseSteamAppId,
   applyPrice,
   STEAM_CURRENCY,
   wishlistSummary,
   dotaMedal,
+  MEDAL_KEYS,
   faceitLevel,
   faceitToNext,
   DEADLOCK_TIERS,
@@ -29,20 +32,18 @@ import { go } from '../app.js';
 let tab = 'wishlist';
 let refreshing = false;
 
-const TABS = [
-  ['wishlist', 'Вишлист Steam'],
-  ['ranks', 'Ранги'],
-  ['clips', 'Контент'],
-];
+const TABS = ['wishlist', 'ranks', 'clips'];
 
 // Prices come from the Ukrainian Steam store (₴); older items may still be in another currency.
-const fmtPrice = (v, cur = '₴') => `${(Math.round(v * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 })} ${cur}`;
+const fmtPrice = (v, cur = '₴') => `${(Math.round(v * 100) / 100).toLocaleString(locale(), { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 })} ${cur}`;
 const toMain = (v, cur = '₴') => convert(v, cur, state.data.settings.currency, state.data.rates);
 /** Store price, plus the main currency next to it when they differ. */
 const priceText = (v, cur = '₴') => (cur === state.data.settings.currency ? fmtPrice(v, cur) : `${fmtPrice(v, cur)} ≈ ${money(toMain(v, cur))}`);
 const isPlaceholderName = (name) => !name || /^App \d+$/.test(name);
 // Names are looked up once per session, so a game Steam doesn't know isn't requested on every render.
 const triedNames = new Set();
+const medalName = (mmr) => dotaMedal(mmr, MEDAL_KEYS.map((k) => t(`medal.${k}`)));
+const clipStatusLabel = (k) => t(`clip.status.${k}`);
 
 /** Full info for one game: real name, capsule image and price (used for links and old placeholder names). */
 async function fetchApp(id) {
@@ -70,7 +71,7 @@ export async function refreshPrices({ silent = false } = {}) {
   const res = await window.api.steam.prices(items.map((i) => i.id));
   refreshing = false;
   if (!res.ok) {
-    if (!silent) toast('Steam не ответил — попробуй позже');
+    if (!silent) toast(t('games.steamDown'));
     return rerender();
   }
   const date = today();
@@ -89,14 +90,14 @@ export async function refreshPrices({ silent = false } = {}) {
     const info = await fetchApp(i.id);
     if (info) update((d) => Object.assign(d.wishlist.find((x) => x.id === i.id), { name: info.name, image: info.image || i.image }));
   }
-  if (!silent) toast('Цены обновлены');
-  else if (newSales) toast(`Новые скидки в вишлисте: ${newSales}`);
+  if (!silent) toast(t('games.pricesUpdated'));
+  else if (newSales) toast(t('games.newSales', { n: newSales }));
 }
 
 async function addGame(id, name, image) {
-  if (state.data.wishlist.some((i) => i.id === id)) return toast('Уже в вишлисте');
+  if (state.data.wishlist.some((i) => i.id === id)) return toast(t('games.already'));
   const info = await fetchApp(id);
-  if (!info && !name) return toast('Игра не найдена в Steam — проверь ссылку');
+  if (!info && !name) return toast(t('games.notFound'));
   const item = {
     id,
     name: info?.name || name,
@@ -106,25 +107,25 @@ async function addGame(id, name, image) {
     addedAt: today(),
   };
   update((d) => d.wishlist.push(info ? applyPrice(item, info.overview, today()) : item));
-  toast(`${item.name} — в вишлисте`);
+  toast(t('games.added', { name: item.name }));
 }
 
 function searchModal() {
-  const input = h('input', { class: 'input', placeholder: 'Название игры или ссылка на страницу в Steam' });
+  const input = h('input', { class: 'input', placeholder: t('games.searchPh') });
   const results = h('div', { class: 'list search-results' });
   let timer;
   const search = async () => {
     const q = input.value.trim();
     const appId = parseSteamAppId(q);
     if (appId) {
-      results.replaceChildren(h('div', { class: 'list-row', style: { cursor: 'pointer' }, onclick: () => (addGame(appId, null), modal.close()) }, h('div', { class: 'grow' }, `Добавить игру #${appId} по ссылке`)));
+      results.replaceChildren(h('div', { class: 'list-row', style: { cursor: 'pointer' }, onclick: () => (addGame(appId, null), modal.close()) }, h('div', { class: 'grow' }, t('games.addById', { id: appId }))));
       return;
     }
     if (q.length < 2) return results.replaceChildren();
-    results.replaceChildren(h('p', { class: 'muted' }, 'Ищу…'));
+    results.replaceChildren(h('p', { class: 'muted' }, t('games.searching')));
     const res = await window.api.steam.search(q);
     if (input.value.trim() !== q) return;
-    if (!res.ok) return results.replaceChildren(h('p', { class: 'muted' }, 'Steam не ответил'));
+    if (!res.ok) return results.replaceChildren(h('p', { class: 'muted' }, t('games.steamNoAnswer')));
     results.replaceChildren(
       ...(res.items.length
         ? res.items.slice(0, 8).map((it) =>
@@ -140,23 +141,23 @@ function searchModal() {
               },
               h('img', { src: it.tiny_image, class: 'capsule', width: 92, height: 35, alt: '' }),
               h('div', { class: 'grow title' }, it.name),
-              h('div', { class: 'meta' }, it.price ? fmtPrice(it.price.final / 100, STEAM_CURRENCY[it.price.currency]) : 'бесплатно'),
+              h('div', { class: 'meta' }, it.price ? fmtPrice(it.price.final / 100, STEAM_CURRENCY[it.price.currency]) : t('games.free')),
             ),
           )
-        : [h('p', { class: 'muted' }, 'Ничего не нашлось')]),
+        : [h('p', { class: 'muted' }, t('common.nothingFound'))]),
     );
   };
   input.addEventListener('input', () => {
     clearTimeout(timer);
     timer = setTimeout(search, 350);
   });
-  const modal = openModal('Добавить в вишлист', h('div', { class: 'stack', style: { gap: '10px' } }, input, results));
+  const modal = openModal(t('games.addTitle'), h('div', { class: 'stack', style: { gap: '10px' } }, input, results));
 }
 
 function targetModal(item) {
   formModal(
     item.name,
-    [{ key: 'target', label: `Куплю, если цена станет не выше, ${item.currency || '₴'}`, type: 'number', placeholder: 'например, 500' }],
+    [{ key: 'target', label: t('games.targetLabel', { cur: item.currency || '₴' }), type: 'number', placeholder: t('games.targetPh') }],
     { target: item.target ?? '' },
     {
       onSave: (v) => update((d) => (d.wishlist.find((i) => i.id === item.id).target = v.target > 0 ? v.target : null)),
@@ -179,9 +180,9 @@ function wishRow(i) {
         'div',
         { class: 'meta' },
         [
-          i.lowest != null && i.history?.length > 1 && `мин. ${fmtPrice(i.lowest, i.currency)}`,
-          i.target > 0 && (hit ? `🎯 цель ${fmtPrice(i.target, i.currency)} достигнута` : `цель ${fmtPrice(i.target, i.currency)}`),
-          i.updatedAt && `проверено ${prettyDate(i.updatedAt)}`,
+          i.lowest != null && i.history?.length > 1 && t('games.lowest', { price: fmtPrice(i.lowest, i.currency) }),
+          i.target > 0 && (hit ? t('games.targetHit', { price: fmtPrice(i.target, i.currency) }) : t('games.target', { price: fmtPrice(i.target, i.currency) })),
+          i.updatedAt && t('games.checked', { date: prettyDate(i.updatedAt) }),
         ]
           .filter(Boolean)
           .join(' · '),
@@ -191,10 +192,10 @@ function wishRow(i) {
     h(
       'div',
       { style: { textAlign: 'right', minWidth: '96px' } },
-      i.price == null ? h('div', { class: 'meta' }, 'нет цены') : [i.discount > 0 && h('div', { class: 'meta strike' }, fmtPrice(i.initial, i.currency)), h('div', { class: 'amount' }, priceText(i.price, i.currency))],
+      i.price == null ? h('div', { class: 'meta' }, t('games.noPrice')) : [i.discount > 0 && h('div', { class: 'meta strike' }, fmtPrice(i.initial, i.currency)), h('div', { class: 'amount' }, priceText(i.price, i.currency))],
     ),
-    h('button', { class: 'btn ghost sm icon-only', title: 'Цель по цене / удалить', onclick: () => targetModal(i) }, icon('edit', 15)),
-    h('a', { class: 'btn ghost sm icon-only', title: 'Открыть в Steam', href: `https://store.steampowered.com/app/${i.id}/`, target: '_blank' }, icon('up', 15)),
+    h('button', { class: 'btn ghost sm icon-only', title: t('games.targetHint'), onclick: () => targetModal(i) }, icon('edit', 15)),
+    h('a', { class: 'btn ghost sm icon-only', title: t('games.openSteam'), href: `https://store.steampowered.com/app/${i.id}/`, target: '_blank' }, icon('up', 15)),
   );
 }
 
@@ -203,24 +204,25 @@ function wishlistTab() {
   if (items.some((i) => i.updatedAt !== today() || (i.price != null && i.currency !== '₴') || (isPlaceholderName(i.name) && !triedNames.has(i.id)))) setTimeout(() => refreshPrices({ silent: true }), 0);
   const s = wishlistSummary(items, toMain);
   const sorted = [...items].sort((a, b) => (b.discount || 0) - (a.discount || 0) || (a.price ?? 1e9) - (b.price ?? 1e9));
+  const gamesBudget = state.data.budgets[CAT.games];
   return [
     h(
       'div',
       { class: 'grid cols-4', style: { marginBottom: '16px' } },
-      tile('Со скидкой сейчас', String(s.onSale), s.onSale ? `экономия ${money(s.saving)}` : 'скидок нет', true),
-      tile('Достигли твоей цены', String(s.atTarget), 'задай цель кнопкой ✎'),
-      tile('Весь вишлист', money(s.total), `${items.length} игр · цены украинского Steam`),
-      tile('Бюджет на игры · месяц', money(state.data.budgets['Игры'] || 0), state.data.budgets['Игры'] ? 'лимит категории «Игры»' : 'задай в Финансы → Бюджеты'),
+      tile(t('games.onSale'), String(s.onSale), s.onSale ? t('games.saving', { amount: money(s.saving) }) : t('games.noSales'), true),
+      tile(t('games.atTarget'), String(s.atTarget), t('games.setTarget')),
+      tile(t('games.whole'), money(s.total), t('games.wholeNote', { n: items.length })),
+      tile(t('games.budget'), money(gamesBudget || 0), gamesBudget ? t('games.budgetNote') : t('games.budgetSet')),
     ),
     card(
-      'Вишлист',
+      t('games.wishlist'),
       h(
         'div',
         { class: 'row' },
-        h('button', { class: 'btn sm', disabled: refreshing || !items.length, onclick: () => refreshPrices() }, icon('refresh', 14), refreshing ? 'Проверяю…' : 'Цены'),
-        h('button', { class: 'btn primary sm', onclick: searchModal }, icon('plus', 14), 'Игра'),
+        h('button', { class: 'btn sm', disabled: refreshing || !items.length, onclick: () => refreshPrices() }, icon('refresh', 14), refreshing ? t('games.checking') : t('games.prices')),
+        h('button', { class: 'btn primary sm', onclick: searchModal }, icon('plus', 14), t('games.game')),
       ),
-      items.length ? h('div', { class: 'list' }, sorted.map(wishRow)) : empty('Добавь игры, которые хочешь купить — цены украинского Steam проверяются каждый день, скидки всплывают сверху.'),
+      items.length ? h('div', { class: 'list' }, sorted.map(wishRow)) : empty(t('games.wishEmpty')),
     ),
   ];
 }
@@ -228,14 +230,14 @@ function wishlistTab() {
 // ---- ranks ----
 
 const TRACKS = {
-  dota: { title: 'Dota 2 · MMR', unit: 'MMR', fmt: (v) => Math.round(v).toLocaleString('ru-RU'), sub: (v) => `≈ ${dotaMedal(v)}` },
+  dota: { title: () => 'Dota 2 · MMR', unit: 'MMR', fmt: (v) => num(Math.round(v)), sub: (v) => `≈ ${medalName(v)}` },
   faceit: {
-    title: 'CS2 · FACEIT',
+    title: () => 'CS2 · FACEIT',
     unit: 'ELO',
-    fmt: (v) => `${Math.round(v).toLocaleString('ru-RU')}`,
-    sub: (v) => `${faceitLevel(v)} lvl${faceitToNext(v) != null ? ` · до ${faceitLevel(v) + 1} lvl: ${faceitToNext(v)} ELO` : ''}`,
+    fmt: (v) => num(Math.round(v)),
+    sub: (v) => `${faceitLevel(v)} lvl${faceitToNext(v) != null ? ` · ${t('games.toLevel', { level: faceitLevel(v) + 1, elo: faceitToNext(v) })}` : ''}`,
   },
-  deadlock: { title: 'Deadlock · ранг', unit: '', fmt: (v) => deadlockName(v), sub: () => 'Obscurus → Eternus' },
+  deadlock: { title: () => t('games.deadlockTitle'), unit: '', fmt: (v) => deadlockName(v), sub: () => 'Obscurus → Eternus' },
 };
 
 function rankEntryModal(key, entry) {
@@ -243,16 +245,16 @@ function rankEntryModal(key, entry) {
   const deadlock = key === 'deadlock';
   const fields = deadlock
     ? [
-        { key: 'tier', label: 'Ранг', type: 'select', options: DEADLOCK_TIERS.map((t, i) => [i, t]), half: true },
-        { key: 'sub', label: 'Подранг', type: 'select', options: [1, 2, 3, 4, 5, 6].map((n) => [n, String(n)]), half: true },
+        { key: 'tier', label: t('games.rank'), type: 'select', options: DEADLOCK_TIERS.map((x, i) => [i, x]), half: true },
+        { key: 'sub', label: t('games.subrank'), type: 'select', options: [1, 2, 3, 4, 5, 6].map((n) => [n, String(n)]), half: true },
       ]
     : [{ key: 'value', label: key === 'dota' ? 'MMR' : 'FACEIT ELO', type: 'number', required: true, half: true }];
   const last = state.data.ranks[key].entries.at(-1);
   const init = entry || {};
   const v = deadlock ? { tier: Math.floor((init.value ?? last?.value ?? 0) / 6), sub: ((init.value ?? last?.value ?? 0) % 6) + 1 } : { value: init.value ?? '' };
   formModal(
-    `${TRACKS[key].title}${isNew ? ' — записать' : ''}`,
-    [...fields, { key: 'date', label: 'Дата', type: 'date', half: !deadlock }, { key: 'note', label: 'Заметка: что получилось, что улучшить', type: 'textarea', rows: 3 }],
+    `${TRACKS[key].title()}${isNew ? ` — ${t('games.record')}` : ''}`,
+    [...fields, { key: 'date', label: t('common.date'), type: 'date', half: !deadlock }, { key: 'note', label: t('games.noteLabel'), type: 'textarea', rows: 3 }],
     { ...v, date: init.date || today(), note: init.note || '' },
     {
       onSave: (x) => {
@@ -276,13 +278,13 @@ function rankGoalModal(key) {
   const goal = state.data.ranks[key].goal;
   const deadlock = key === 'deadlock';
   formModal(
-    `Цель: ${TRACKS[key].title}`,
+    t('games.goalOf', { title: TRACKS[key].title() }),
     deadlock
       ? [
-          { key: 'tier', label: 'Ранг', type: 'select', options: DEADLOCK_TIERS.map((t, i) => [i, t]), half: true },
-          { key: 'sub', label: 'Подранг', type: 'select', options: [1, 2, 3, 4, 5, 6].map((n) => [n, String(n)]), half: true },
+          { key: 'tier', label: t('games.rank'), type: 'select', options: DEADLOCK_TIERS.map((x, i) => [i, x]), half: true },
+          { key: 'sub', label: t('games.subrank'), type: 'select', options: [1, 2, 3, 4, 5, 6].map((n) => [n, String(n)]), half: true },
         ]
-      : [{ key: 'value', label: key === 'dota' ? 'Цель по MMR' : 'Цель по ELO', type: 'number' }],
+      : [{ key: 'value', label: t('games.goalValue', { unit: key === 'dota' ? 'MMR' : 'ELO' }), type: 'number' }],
     deadlock ? { tier: goal != null ? Math.floor(goal / 6) : 11, sub: goal != null ? (goal % 6) + 1 : 1 } : { value: goal ?? '' },
     {
       onSave: (x) => update((d) => (d.ranks[key].goal = deadlock ? deadlockValue(Number(x.tier), Number(x.sub)) : x.value > 0 ? x.value : null)),
@@ -300,12 +302,12 @@ function saveToday(key, value) {
     else list.push({ id: uid(), date: today(), value, note: '' });
     list.sort((a, b) => a.date.localeCompare(b.date));
   });
-  toast('Записано');
+  toast(t('games.saved'));
 }
 
 /** Inline «current value» form at the top of each rank card. */
 function quickEntry(key) {
-  const t = TRACKS[key];
+  const tr = TRACKS[key];
   const last = state.data.ranks[key].entries.at(-1)?.value;
   if (key === 'deadlock') {
     const cur = last ?? 0;
@@ -316,13 +318,13 @@ function quickEntry(key) {
       { class: 'row quick-rank', onsubmit: (e) => (e.preventDefault(), saveToday(key, deadlockValue(Number(tier.value), Number(sub.value)))) },
       tier,
       sub,
-      h('button', { class: 'btn primary', type: 'submit' }, 'Сохранить'),
+      h('button', { class: 'btn primary', type: 'submit' }, t('common.save')),
     );
   }
   const input = h('input', {
     class: 'input',
     inputmode: 'numeric',
-    placeholder: last != null ? 'Сколько' : `Текущий ${t.unit}`,
+    placeholder: last != null ? t('games.howMuch') : t('games.currentUnit', { unit: tr.unit }),
     style: { flex: 1, minWidth: '90px' },
   });
   /** mode: 'add' | 'sub' | 'set'. A typed «+25» / «−25» also works with any button. */
@@ -331,13 +333,13 @@ function quickEntry(key) {
     const signed = /^[+−-]/.test(raw);
     const amount = parseRankInput(raw.replace(/^[+−-]/, ''), null);
     if (amount == null) {
-      toast('Впиши число');
+      toast(t('games.enterNumber'));
       return input.focus();
     }
     let value;
     if (mode === 'set' && !signed) value = amount;
     else if (last == null) {
-      toast(`Сначала задай текущий ${t.unit}`);
+      toast(t('games.setCurrentFirst', { unit: tr.unit }));
       return input.focus();
     } else value = parseRankInput(signed ? raw : `${mode === 'sub' ? '-' : '+'}${amount}`, last);
     saveToday(key, value);
@@ -346,41 +348,47 @@ function quickEntry(key) {
     'form',
     { class: 'row quick-rank', onsubmit: (e) => (e.preventDefault(), apply(last != null ? 'add' : 'set')) },
     input,
-    last != null && h('button', { class: 'btn', type: 'button', title: 'Прибавить к текущему', onclick: () => apply('add') }, '+ Добавить'),
-    last != null && h('button', { class: 'btn', type: 'button', title: 'Отнять от текущего', onclick: () => apply('sub') }, '− Отнять'),
-    h('button', { class: `btn${last == null ? ' primary' : ' ghost'}`, type: 'button', title: 'Записать это число как текущее значение', onclick: () => apply('set') }, last == null ? 'Сохранить' : 'Задать'),
+    last != null && h('button', { class: 'btn', type: 'button', title: t('games.addHint'), onclick: () => apply('add') }, t('games.addBtn')),
+    last != null && h('button', { class: 'btn', type: 'button', title: t('games.subHint'), onclick: () => apply('sub') }, t('games.subBtn')),
+    h('button', { class: `btn${last == null ? ' primary' : ' ghost'}`, type: 'button', title: t('games.setHint'), onclick: () => apply('set') }, last == null ? t('common.save') : t('games.setBtn')),
   );
 }
 
 function rankCard(key) {
-  const t = TRACKS[key];
+  const tr = TRACKS[key];
   const { goal, entries } = state.data.ranks[key];
   const p = rankProgress(entries, goal, today());
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
-  const delta = (v) => (key === 'deadlock' ? `${v > 0 ? '+' : ''}${v} подр.` : `${v > 0 ? '+' : ''}${Math.round(v)} ${t.unit}`);
+  const subranks = (v) => t('games.subranks', { v });
+  const delta = (v) => (key === 'deadlock' ? subranks(`${v > 0 ? '+' : ''}${v}`) : `${v > 0 ? '+' : ''}${Math.round(v)} ${tr.unit}`);
   return card(
-    t.title,
+    tr.title(),
     h(
       'div',
       { class: 'row' },
-      h('button', { class: 'btn ghost sm', title: 'Цель', onclick: () => rankGoalModal(key) }, goal != null ? `Цель: ${t.fmt(goal)}` : 'Поставить цель'),
-      h('button', { class: 'btn ghost sm icon-only', title: 'Запись с датой и заметкой', onclick: () => rankEntryModal(key) }, icon('edit', 14)),
+      h('button', { class: 'btn ghost sm', title: t('games.goal'), onclick: () => rankGoalModal(key) }, goal != null ? t('games.goalShort', { v: tr.fmt(goal) }) : t('games.setGoal')),
+      h('button', { class: 'btn ghost sm icon-only', title: t('games.entryHint'), onclick: () => rankEntryModal(key) }, icon('edit', 14)),
     ),
-    h('div', { class: 'meta', style: { marginBottom: '6px' } }, key === 'deadlock' ? 'Текущий ранг' : `Текущий ${t.unit}`),
+    h('div', { class: 'meta', style: { marginBottom: '6px' } }, key === 'deadlock' ? t('games.currentRank') : t('games.currentUnit', { unit: tr.unit })),
     quickEntry(key),
     p.current == null
-      ? empty(goal != null ? `Цель: ${t.fmt(goal)}. Впиши текущий ${key === 'deadlock' ? 'ранг' : t.unit} выше — появится прогресс.` : 'Впиши текущее значение выше — после каждой сессии или раз в неделю.')
+      ? empty(goal != null ? t('games.goalNoCurrent', { goal: tr.fmt(goal), what: key === 'deadlock' ? t('games.rankWord') : tr.unit }) : t('games.enterCurrent'))
       : [
-          h('div', { class: 'stat-value' }, t.fmt(p.current)),
-          h('div', { class: 'muted' }, t.sub(p.current)),
+          h('div', { class: 'stat-value' }, tr.fmt(p.current)),
+          h('div', { class: 'muted' }, tr.sub(p.current)),
           h(
             'div',
             { class: 'meta', style: { margin: '6px 0 10px' } },
-            [p.change30 != null && `за 30 дней: ${delta(p.change30)}`, goal != null && (p.toGoal <= 0 ? `🎯 цель ${t.fmt(goal)} достигнута` : `до цели ${t.fmt(goal)}: ${key === 'deadlock' ? `${p.toGoal} подр.` : `${Math.round(p.toGoal)} ${t.unit}`}`)].filter(Boolean).join(' · ') || 'добавь ещё записи — появится динамика',
+            [
+              p.change30 != null && t('games.change30', { v: delta(p.change30) }),
+              goal != null && (p.toGoal <= 0 ? t('games.goalHit', { goal: tr.fmt(goal) }) : t('games.toGoal', { goal: tr.fmt(goal), left: key === 'deadlock' ? subranks(p.toGoal) : `${Math.round(p.toGoal)} ${tr.unit}` })),
+            ]
+              .filter(Boolean)
+              .join(' · ') || t('games.moreEntries'),
           ),
           sorted.length > 1 &&
             lineChart({
-              points: sorted.map((e) => ({ label: e.date.slice(8, 10) + '.' + e.date.slice(5, 7), value: e.value, tip: `${prettyDate(e.date)}\n${t.fmt(e.value)}${e.note ? `\n${e.note.slice(0, 60)}` : ''}` })),
+              points: sorted.map((e) => ({ label: e.date.slice(8, 10) + '.' + e.date.slice(5, 7), value: e.value, tip: `${prettyDate(e.date)}\n${tr.fmt(e.value)}${e.note ? `\n${e.note.slice(0, 60)}` : ''}` })),
               height: 170,
               width: 380,
               format: key === 'deadlock' ? (v) => deadlockName(v).split(' ')[0] : (v) => compact(v),
@@ -396,7 +404,7 @@ function rankCard(key) {
                 h(
                   'div',
                   { class: 'list-row', style: { cursor: 'pointer' }, onclick: () => rankEntryModal(key, e) },
-                  h('div', { class: 'grow' }, h('div', { class: 'title' }, t.fmt(e.value)), e.note && h('div', { class: 'meta' }, e.note)),
+                  h('div', { class: 'grow' }, h('div', { class: 'title' }, tr.fmt(e.value)), e.note && h('div', { class: 'meta' }, e.note)),
                   h('div', { class: 'meta' }, prettyDate(e.date)),
                 ),
               ),
@@ -406,25 +414,14 @@ function rankCard(key) {
 }
 
 function ranksTab() {
-  const notes = ['dota', 'faceit', 'deadlock'].flatMap((k) => state.data.ranks[k].entries.filter((e) => e.note).map((e) => `- ${TRACKS[k].title}, ${e.date}: ${e.note}`));
+  const notes = ['dota', 'faceit', 'deadlock'].flatMap((k) => state.data.ranks[k].entries.filter((e) => e.note).map((e) => `- ${TRACKS[k].title()}, ${e.date}: ${e.note}`));
   return [
     h('div', { class: 'grid cols-3', style: { alignItems: 'start' } }, rankCard('dota'), rankCard('faceit'), rankCard('deadlock')),
     notes.length > 0 &&
       h(
         'div',
         { class: 'row', style: { marginTop: '16px' } },
-        h(
-          'button',
-          {
-            class: 'btn',
-            onclick: () =>
-              go('grok', {
-                prompt: `Вот мои заметки после игр (Dota 2, CS2 FACEIT, Deadlock):\n${notes.slice(-30).join('\n')}\n\nНайди повторяющиеся ошибки и дай план тренировок на 2 недели для каждой игры — коротко и конкретно.`,
-              }),
-          },
-          icon('spark', 16),
-          'Grok: что я повторяю из игры в игру',
-        ),
+        h('button', { class: 'btn', onclick: () => go('grok', { prompt: t('prompt.gameNotes', { notes: notes.slice(-30).join('\n') }) }) }, icon('spark', 16), t('games.grokRepeat')),
       ),
   ];
 }
@@ -434,17 +431,17 @@ function ranksTab() {
 function clipModal(c) {
   const isNew = !c;
   formModal(
-    isNew ? 'Новый клип' : c.title,
+    isNew ? t('clips.new') : c.title,
     [
-      { key: 'title', label: 'Название / хук', required: true, placeholder: 'Например, «Хук через всю карту»' },
-      { key: 'game', label: 'Игра', list: ['Dota 2', 'CS2', 'Deadlock'], half: true },
-      { key: 'status', label: 'Статус', type: 'select', options: CLIP_STATUSES, half: true },
-      { key: 'idea', label: 'Идея, момент из игры, текст на экране', type: 'textarea', rows: 3 },
-      { key: 'tiktok', label: 'Просмотры TikTok', type: 'number', half: true },
-      { key: 'shorts', label: 'Просмотры Shorts', type: 'number', half: true },
-      { key: 'youtube', label: 'Просмотры YouTube', type: 'number', half: true },
-      { key: 'date', label: 'Дата публикации', type: 'date', half: true },
-      { key: 'link', label: 'Ссылка на ролик' },
+      { key: 'title', label: t('clips.title'), required: true, placeholder: t('clips.titlePh') },
+      { key: 'game', label: t('clips.game'), list: ['Dota 2', 'CS2', 'Deadlock'], half: true },
+      { key: 'status', label: t('common.status'), type: 'select', options: CLIP_STATUSES.map(([k]) => [k, clipStatusLabel(k)]), half: true },
+      { key: 'idea', label: t('clips.idea'), type: 'textarea', rows: 3 },
+      { key: 'tiktok', label: t('clips.viewsOf', { platform: 'TikTok' }), type: 'number', half: true },
+      { key: 'shorts', label: t('clips.viewsOf', { platform: 'Shorts' }), type: 'number', half: true },
+      { key: 'youtube', label: t('clips.viewsOf', { platform: 'YouTube' }), type: 'number', half: true },
+      { key: 'date', label: t('clips.date'), type: 'date', half: true },
+      { key: 'link', label: t('clips.link') },
     ],
     { title: '', game: 'Dota 2', status: 'idea', idea: '', date: '', link: '', ...(c || {}), ...(c?.views || {}) },
     {
@@ -480,10 +477,7 @@ function moveClip(c, dir) {
 }
 
 function scriptPrompt(c) {
-  return (
-    `Помоги сделать короткий вертикальный ролик (TikTok / Shorts) из момента в ${c.game}: «${c.title}». ${c.idea ? `Что было: ${c.idea}. ` : ''}` +
-    'Дай: 3 варианта хука на первые 2 секунды, текст на экране по секундам, идею для звука/мема, описание и 8 хештегов. Ролик до 30 секунд.'
-  );
+  return t('prompt.clip', { game: c.game, title: c.title, idea: c.idea ? t('prompt.clipIdea', { idea: c.idea }) : '' });
 }
 
 function clipsTab() {
@@ -493,18 +487,18 @@ function clipsTab() {
     h(
       'div',
       { class: 'grid cols-4', style: { marginBottom: '16px' } },
-      tile('Просмотров всего', compact(st.total), `${st.published} опубликовано · в среднем ${compact(st.avg)}`, true),
-      ...PLATFORMS.map(([k, label]) => tile(label, compact(st.byPlatform[k]), st.best && clipViews(st.best) ? null : 'просмотры вписываются в клип')),
+      tile(t('clips.totalViews'), compact(st.total), t('clips.publishedAvg', { n: st.published, avg: compact(st.avg) }), true),
+      ...PLATFORMS.map(([k, label]) => tile(label, compact(st.byPlatform[k]), st.best && clipViews(st.best) ? null : t('clips.viewsHint'))),
     ),
     h(
       'div',
       { class: 'kanban kanban-4', style: { marginBottom: '16px' } },
-      CLIP_STATUSES.map(([k, label], idx) => {
+      CLIP_STATUSES.map(([k], idx) => {
         const list = clips.filter((c) => c.status === k).sort((a, b) => (k === 'published' ? clipViews(b) - clipViews(a) : 0));
         return h(
           'div',
           { class: 'kanban-col' },
-          h('div', { class: 'kanban-head' }, h('span', {}, label), h('span', { class: 'muted' }, String(list.length))),
+          h('div', { class: 'kanban-head' }, h('span', {}, clipStatusLabel(k)), h('span', { class: 'muted' }, String(list.length))),
           list.map((c) =>
             h(
               'div',
@@ -513,20 +507,20 @@ function clipsTab() {
                 'div',
                 { style: { cursor: 'pointer' }, onclick: () => clipModal(c) },
                 h('div', { class: 'title', style: { fontWeight: 600 } }, c.title),
-                h('div', { class: 'row', style: { gap: '6px', marginTop: '6px', flexWrap: 'wrap' } }, h('span', { class: 'badge' }, c.game || 'Игра'), k === 'published' && h('span', { class: 'badge solid' }, `${compact(clipViews(c))} просм.`)),
+                h('div', { class: 'row', style: { gap: '6px', marginTop: '6px', flexWrap: 'wrap' } }, h('span', { class: 'badge' }, c.game || t('clips.game')), k === 'published' && h('span', { class: 'badge solid' }, t('clips.viewsShort', { v: compact(clipViews(c)) }))),
               ),
               h(
                 'div',
                 { class: 'row', style: { gap: '2px', marginTop: '8px' } },
-                idx > 0 && h('button', { class: 'btn ghost sm icon-only', title: 'Назад', onclick: () => moveClip(c, -1) }, icon('left', 14)),
+                idx > 0 && h('button', { class: 'btn ghost sm icon-only', title: t('clips.back'), onclick: () => moveClip(c, -1) }, icon('left', 14)),
                 h('div', { class: 'spacer' }),
-                k !== 'published' && h('button', { class: 'btn ghost sm', title: 'Сценарий с Grok', onclick: () => go('grok', { prompt: scriptPrompt(c) }) }, icon('spark', 13), 'Сценарий'),
-                c.link && h('a', { class: 'btn ghost sm icon-only', href: c.link, target: '_blank', title: 'Открыть ролик' }, icon('up', 14)),
-                idx < CLIP_STATUSES.length - 1 && h('button', { class: 'btn ghost sm icon-only', title: 'Дальше', onclick: () => moveClip(c, 1) }, icon('right', 14)),
+                k !== 'published' && h('button', { class: 'btn ghost sm', title: t('clips.scriptHint'), onclick: () => go('grok', { prompt: scriptPrompt(c) }) }, icon('spark', 13), t('clips.script')),
+                c.link && h('a', { class: 'btn ghost sm icon-only', href: c.link, target: '_blank', title: t('clips.open') }, icon('up', 14)),
+                idx < CLIP_STATUSES.length - 1 && h('button', { class: 'btn ghost sm icon-only', title: t('clips.next'), onclick: () => moveClip(c, 1) }, icon('right', 14)),
               ),
             ),
           ),
-          k === 'idea' && h('button', { class: 'btn ghost sm', style: { width: '100%' }, onclick: () => clipModal(null) }, icon('plus', 14), 'Идея'),
+          k === 'idea' && h('button', { class: 'btn ghost sm', style: { width: '100%' }, onclick: () => clipModal(null) }, icon('plus', 14), t('clips.idea1')),
         );
       }),
     ),
@@ -539,14 +533,11 @@ function clipsTab() {
           class: 'btn',
           onclick: () =>
             go('grok', {
-              prompt:
-                'Я играю в Dota 2, CS2 и Deadlock и хочу снимать короткие ролики (TikTok, Shorts) и длинные на YouTube. ' +
-                `Уже было: ${clips.map((c) => `${c.title} (${c.game}, ${compact(clipViews(c))} просм.)`).join('; ') || 'пока ничего'}. ` +
-                'Предложи 15 идей роликов с хуками, какие форматы сейчас заходят, как часто выкладывать и как привести зрителей в мой Telegram-канал.',
+              prompt: t('prompt.clipIdeas', { list: clips.map((c) => `${c.title} (${c.game}, ${t('clips.viewsShort', { v: compact(clipViews(c)) })})`).join('; ') || t('prompt.nothingYet') }),
             }),
         },
         icon('spark', 16),
-        'Grok: идеи роликов',
+        t('clips.grokIdeas'),
       ),
     ),
   ];
@@ -559,11 +550,11 @@ export function gamesView() {
   return h(
     'div',
     { class: 'page' },
-    h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Игры'), h('div', { class: 'sub' }, 'Вишлист Steam со скидками, ранги и ролики из игр'))),
+    h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, t('nav.games')), h('div', { class: 'sub' }, t('games.sub')))),
     h(
       'div',
       { class: 'seg', style: { marginBottom: '18px' } },
-      TABS.map(([k, label]) => h('button', { class: tab === k ? 'on' : '', onclick: () => ((tab = k), rerender()) }, label)),
+      TABS.map((k) => h('button', { class: tab === k ? 'on' : '', 'data-tab': k, onclick: () => ((tab = k), rerender()) }, t(`games.tab.${k}`))),
     ),
     ...body,
   );
@@ -574,19 +565,19 @@ export function gamesCard() {
   const s = wishlistSummary(state.data.wishlist);
   const r = state.data.ranks;
   const last = (k) => r[k].entries.at(-1)?.value;
-  const open = (t) => () => {
-    tab = t;
+  const open = (x) => () => {
+    tab = x;
     go('games');
   };
   const line = (label, value, onclick) => h('div', { class: 'list-row', style: { cursor: 'pointer' }, onclick }, h('div', { class: 'grow meta' }, label), h('div', { class: 'amount' }, value));
   return card(
-    'Игры',
-    h('button', { class: 'btn ghost sm', onclick: () => go('games') }, 'Открыть', icon('right', 14)),
+    t('nav.games'),
+    h('button', { class: 'btn ghost sm', onclick: () => go('games') }, t('common.open'), icon('right', 14)),
     h(
       'div',
       { class: 'list' },
-      line('Скидки в вишлисте', state.data.wishlist.length ? (s.onSale ? `${s.onSale} 🔥` : 'нет') : '—', open('wishlist')),
-      line('Dota 2 MMR', last('dota') != null ? Math.round(last('dota')).toLocaleString('ru-RU') : '—', open('ranks')),
+      line(t('games.salesInWishlist'), state.data.wishlist.length ? (s.onSale ? `${s.onSale} 🔥` : t('common.no')) : '—', open('wishlist')),
+      line('Dota 2 MMR', last('dota') != null ? num(Math.round(last('dota'))) : '—', open('ranks')),
       line('FACEIT', last('faceit') != null ? `${Math.round(last('faceit'))} · ${faceitLevel(last('faceit'))} lvl` : '—', open('ranks')),
       line('Deadlock', last('deadlock') != null ? deadlockName(last('deadlock')) : '—', open('ranks')),
     ),
