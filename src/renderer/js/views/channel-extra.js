@@ -85,7 +85,7 @@ export function planTab(ch) {
   return [
     h(
       'div',
-      { class: 'week-strip', style: { marginBottom: '16px' } },
+      { class: 'week-strip gap-b' },
       week.map((d) => {
         const items = planned.filter((p) => p.date === d);
         return h(
@@ -207,7 +207,7 @@ export function adsTab(ch) {
   return [
     h(
       'div',
-      { class: 'grid cols-4', style: { marginBottom: '16px' } },
+      { class: 'grid cols-4 gap-b' },
       tile(t('ads.costPerSub'), st.costPerSub != null ? money(st.costPerSub) : '—', t('ads.subsFor', { subs: compact(st.gained), amount: money(st.spent) }), true),
       tile(t('ads.spent'), money(st.spent), t('ads.buysN', { n: st.buys })),
       tile(t('ads.earned'), money(st.income), t('ads.sellsN', { n: st.sells })),

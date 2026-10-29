@@ -45,6 +45,10 @@ function defaultData() {
       closeToTray: true,
       autoStart: false,
       notify: defaultNotify(),
+      density: 'compact',
+      // Home cards: { order: [id…], hidden: [id…] }; ids unknown to this version are kept for newer ones.
+      homeLayout: { order: [], hidden: [] },
+      sidebarCollapsed: false,
     },
     // Units of each currency per 1 €; refreshed from the NBU or typed by hand.
     rates: { '€': 1, '₴': 48, $: 1.08, updatedAt: '' },
@@ -87,6 +91,11 @@ function normalize(raw) {
   if (!CURRENCIES.includes(settings.currency)) settings.currency = '€';
   if (!LANGS.includes(settings.lang)) settings.lang = 'ru';
   settings.notify = { ...defaultNotify(), ...obj(raw.settings?.notify) };
+  if (!['compact', 'spacious'].includes(settings.density)) settings.density = 'compact';
+  const layout = obj(raw.settings?.homeLayout);
+  const ids = (v) => arr(v).filter((x) => typeof x === 'string');
+  settings.homeLayout = { order: ids(layout.order), hidden: ids(layout.hidden) };
+  settings.sidebarCollapsed = settings.sidebarCollapsed === true;
   // v1 kept a single channel in `channel`.
   let channels = arr(raw.channels);
   if (!channels.length && raw.channel?.username) channels = [raw.channel];

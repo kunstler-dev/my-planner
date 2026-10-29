@@ -5,7 +5,7 @@ import { h, icon, money, compact, uid, card, empty, toast } from '../ui.js';
 import { t } from '../i18n.js';
 import { openModal } from '../modal.js';
 import { barChart, barList } from '../charts.js';
-import { today, thisMonth, shiftMonth, monthTitle, monthShort, prettyDate } from '../dates.js';
+import { today, thisMonth, shiftMonth, monthTitle, monthShort, prettyDate, shortDate } from '../dates.js';
 import { totals, inMonth, byCategory, monthlySeries, dailyAverage, toCSV, DEFAULT_CATEGORIES, CAT } from '../finance-calc.js';
 import { catLabel, catValue } from '../labels.js';
 import { budgetsTab, recurringTab, goalsTab } from './finance-extra.js';
@@ -17,7 +17,7 @@ const TABS = ['ops', 'budgets', 'recurring', 'goals'];
 export function financeTabs() {
   return h(
     'div',
-    { class: 'seg', style: { marginBottom: '18px' } },
+    { class: 'seg gap-b' },
     TABS.map((k) => h('button', { class: ui.tab === k ? 'on' : '', 'data-tab': k, onclick: () => ((ui.tab = k), update(() => {})) }, t(`finance.tab.${k}`))),
   );
 }
@@ -128,18 +128,45 @@ export function entryModal(entry) {
   setTimeout(() => amount.focus(), 0);
 }
 
-export function entryRow(e, { showDate = false } = {}) {
+/**
+ * One line per operation: date · title · comment (muted, cut with «…», full text on hover) · amount.
+ * row: { date, title, note, amount (signed), onclick }; `date: null` leaves the date column empty under a day header.
+ */
+export function opRow(row) {
   return h(
     'div',
-    { class: 'list-row', style: { cursor: 'pointer' }, onclick: () => entryModal(e) },
-    h(
-      'div',
-      { class: 'grow' },
-      h('div', { class: 'title' }, catLabel(e.category)),
-      (e.note || showDate) && h('div', { class: 'meta' }, [showDate && prettyDate(e.date), e.note].filter(Boolean).join(' · ')),
-    ),
-    h('div', { class: `amount${e.type === 'expense' ? ' out' : ''}` }, money(e.type === 'income' ? e.amount : -e.amount, { sign: true })),
+    { class: 'op-row', onclick: row.onclick, title: row.note || null },
+    h('span', { class: 'op-date' }, row.date ? shortDate(row.date) : ''),
+    h('span', { class: 'op-cat' }, row.title),
+    h('span', { class: 'op-note' }, row.note || ''),
+    h('span', { class: `amount${row.amount < 0 ? ' out' : ''}` }, money(row.amount, { sign: true })),
   );
+}
+
+/**
+ * Rows in date order; a day with two or more rows gets a header with the day total and its rows drop the date,
+ * a single row keeps the date in the line.
+ */
+export function opList(rows) {
+  const byDay = new Map();
+  for (const r of rows) byDay.set(r.date, [...(byDay.get(r.date) || []), r]);
+  return h(
+    'div',
+    { class: 'list' },
+    [...byDay].map(([date, items]) =>
+      items.length < 2
+        ? opRow(items[0])
+        : [
+            h('div', { class: 'day-head' }, h('span', {}, prettyDate(date)), h('span', { class: 'num' }, money(items.reduce((s, r) => s + r.amount, 0), { sign: true }))),
+            items.map((r) => opRow({ ...r, date: null })),
+          ],
+    ),
+  );
+}
+
+/** A finance entry as an opRow. */
+export function entryOp(e) {
+  return { date: e.date, title: catLabel(e.category), note: e.note, amount: e.type === 'income' ? e.amount : -e.amount, onclick: () => entryModal(e) };
 }
 
 function statTile(label, value, note, dark) {
@@ -178,16 +205,7 @@ function opsView() {
     .filter((e) => ui.filter === 'all' || e.type === ui.filter)
     .filter((e) => !q || `${e.category} ${catLabel(e.category)} ${e.note}`.toLowerCase().includes(q))
     .sort((a, b) => b.date.localeCompare(a.date) || (b.id > a.id ? 1 : -1));
-  const byDay = new Map();
-  for (const e of rows) byDay.set(e.date, [...(byDay.get(e.date) || []), e]);
-  const list = h(
-    'div',
-    { class: 'list' },
-    [...byDay].map(([date, items]) => {
-      const dt = totals(items);
-      return [h('div', { class: 'day-head' }, h('span', {}, prettyDate(date)), h('span', { class: 'num' }, money(dt.net, { sign: true }))), items.map((e) => entryRow(e))];
-    }),
-  );
+  const list = opList(rows.map(entryOp));
 
   const filterSeg = h(
     'div',
@@ -282,7 +300,7 @@ function opsView() {
     financeTabs(),
     h(
       'div',
-      { class: 'grid cols-4', style: { marginBottom: '16px' } },
+      { class: 'grid cols-4 gap-b' },
       statTile(t('finance.incomes'), money(tot.income), pctChange(tot.income, prev.income) || t('finance.entriesN', { n: month.filter((e) => e.type === 'income').length })),
       statTile(t('finance.expenses'), money(tot.expense), pctChange(tot.expense, prev.expense) || t('finance.perDay', { amount: money(dailyAverage(all, ui.month, today())) })),
       statTile(t('finance.monthResult'), money(tot.net, { sign: true }), tot.income ? t('finance.savedShare', { p: Math.max(0, Math.round((tot.net / tot.income) * 100)) }) : null, true),
@@ -296,7 +314,7 @@ function opsView() {
     ),
     h(
       'div',
-      { style: { marginTop: '16px' } },
+      { class: 'gap-t' },
       card(
         t('finance.last12'),
         h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'sw-ink' }), t('finance.incomes')), h('span', {}, h('i', { class: 'sw-ghost' }), t('finance.expenses'))),

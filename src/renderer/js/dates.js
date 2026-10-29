@@ -38,6 +38,9 @@ export function monthTitle(key) {
 }
 export const monthShort = (key) => dateOf(`${key}-01`).toLocaleDateString(locale(), { month: 'short' }).replace('.', '');
 
+/** «29 окт.» / «29. Okt.» for the date column of one-line rows. */
+export const shortDate = (dateStr) => dateOf(dateStr).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+
 export const prettyDate = (dateStr) => dateOf(dateStr).toLocaleDateString(locale(), { day: 'numeric', month: 'long' });
 
 export const longToday = () => cap(new Date().toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }));

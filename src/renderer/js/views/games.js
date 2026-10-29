@@ -208,7 +208,7 @@ function wishlistTab() {
   return [
     h(
       'div',
-      { class: 'grid cols-4', style: { marginBottom: '16px' } },
+      { class: 'grid cols-4 gap-b' },
       tile(t('games.onSale'), String(s.onSale), s.onSale ? t('games.saving', { amount: money(s.saving) }) : t('games.noSales'), true),
       tile(t('games.atTarget'), String(s.atTarget), t('games.setTarget')),
       tile(t('games.whole'), money(s.total), t('games.wholeNote', { n: items.length })),
@@ -305,52 +305,76 @@ function saveToday(key, value) {
   toast(t('games.saved'));
 }
 
-/** Inline «current value» form at the top of each rank card. */
-function quickEntry(key) {
+// The rank card whose current value is being edited in place (click on the big number).
+let editingRank = null;
+
+/**
+ * Top of a rank card: the big current value and, in one line, an amount with − and + (Enter = +). Clicking the
+ * value edits it in place («Set»). Deadlock: tier and subrank in one line with Save.
+ */
+function rankTop(key) {
   const tr = TRACKS[key];
   const last = state.data.ranks[key].entries.at(-1)?.value;
   if (key === 'deadlock') {
     const cur = last ?? 0;
-    const tier = h('select', { class: 'input' }, DEADLOCK_TIERS.map((name, i) => h('option', { value: i, selected: i === Math.floor(cur / 6) ? 'selected' : null }, name)));
-    const sub = h('select', { class: 'input', style: { width: '64px' } }, [1, 2, 3, 4, 5, 6].map((n) => h('option', { value: n, selected: n === (cur % 6) + 1 ? 'selected' : null }, String(n))));
-    return h(
-      'form',
-      { class: 'row quick-rank', onsubmit: (e) => (e.preventDefault(), saveToday(key, deadlockValue(Number(tier.value), Number(sub.value)))) },
-      tier,
-      sub,
-      h('button', { class: 'btn primary', type: 'submit' }, t('common.save')),
-    );
+    const tier = h('select', { class: 'input', title: t('games.rank') }, DEADLOCK_TIERS.map((name, i) => h('option', { value: i, selected: i === Math.floor(cur / 6) ? 'selected' : null }, name)));
+    const sub = h('select', { class: 'input sub-pick', title: t('games.subrank') }, [1, 2, 3, 4, 5, 6].map((n) => h('option', { value: n, selected: n === (cur % 6) + 1 ? 'selected' : null }, String(n))));
+    return [
+      last != null && h('div', { class: 'rank-top' }, h('div', { class: 'rank-value', style: { cursor: 'default' } }, tr.fmt(last))),
+      h(
+        'form',
+        { class: 'rank-top', onsubmit: (e) => (e.preventDefault(), saveToday(key, deadlockValue(Number(tier.value), Number(sub.value)))) },
+        tier,
+        sub,
+        h('button', { class: 'btn primary', type: 'submit' }, t('common.save')),
+      ),
+    ];
   }
-  const input = h('input', {
-    class: 'input',
-    inputmode: 'numeric',
-    placeholder: last != null ? t('games.howMuch') : t('games.currentUnit', { unit: tr.unit }),
-    style: { flex: 1, minWidth: '90px' },
-  });
-  /** mode: 'add' | 'sub' | 'set'. A typed «+25» / «−25» also works with any button. */
-  const apply = (mode) => {
-    const raw = input.value.trim();
+  const input = h('input', { class: 'input', inputmode: 'numeric', placeholder: last != null ? t('games.amountPh') : t('games.currentUnit', { unit: tr.unit }) });
+  /** mode: 'add' | 'sub' | 'set'. A typed «+25» / «−25» also works with either button. */
+  const apply = (mode, field = input) => {
+    const raw = field.value.trim();
     const signed = /^[+−-]/.test(raw);
     const amount = parseRankInput(raw.replace(/^[+−-]/, ''), null);
     if (amount == null) {
       toast(t('games.enterNumber'));
-      return input.focus();
+      return field.focus();
     }
     let value;
     if (mode === 'set' && !signed) value = amount;
     else if (last == null) {
       toast(t('games.setCurrentFirst', { unit: tr.unit }));
-      return input.focus();
+      return field.focus();
     } else value = parseRankInput(signed ? raw : `${mode === 'sub' ? '-' : '+'}${amount}`, last);
+    editingRank = null;
     saveToday(key, value);
   };
+  if (last == null) {
+    return h('form', { class: 'rank-top', onsubmit: (e) => (e.preventDefault(), apply('set')) }, input, h('button', { class: 'btn primary', type: 'submit' }, t('common.save')));
+  }
+  if (editingRank === key) {
+    const field = h('input', {
+      class: 'input rank-set',
+      inputmode: 'numeric',
+      value: String(Math.round(last)),
+      onkeydown: (e) => e.key === 'Escape' && ((editingRank = null), rerender()),
+    });
+    setTimeout(() => (field.focus(), field.select()), 0);
+    return h(
+      'form',
+      { class: 'rank-top', onsubmit: (e) => (e.preventDefault(), apply('set', field)) },
+      field,
+      h('button', { class: 'btn primary', type: 'submit', title: t('games.setHint') }, t('games.setBtn')),
+      h('button', { class: 'btn ghost', type: 'button', onclick: () => ((editingRank = null), rerender()) }, t('common.cancel')),
+    );
+  }
   return h(
     'form',
-    { class: 'row quick-rank', onsubmit: (e) => (e.preventDefault(), apply(last != null ? 'add' : 'set')) },
+    { class: 'rank-top', onsubmit: (e) => (e.preventDefault(), apply('add')) },
+    h('button', { class: 'rank-value', type: 'button', title: t('games.setHint'), onclick: () => ((editingRank = key), rerender()) }, tr.fmt(last)),
     input,
-    last != null && h('button', { class: 'btn', type: 'button', title: t('games.addHint'), onclick: () => apply('add') }, t('games.addBtn')),
-    last != null && h('button', { class: 'btn', type: 'button', title: t('games.subHint'), onclick: () => apply('sub') }, t('games.subBtn')),
-    h('button', { class: `btn${last == null ? ' primary' : ' ghost'}`, type: 'button', title: t('games.setHint'), onclick: () => apply('set') }, last == null ? t('common.save') : t('games.setBtn')),
+    h('button', { class: 'btn', type: 'button', title: t('games.subHint'), onclick: () => apply('sub') }, '−'),
+    h('button', { class: 'btn primary', type: 'submit', title: t('games.addHint') }, '+'),
   );
 }
 
@@ -369,16 +393,14 @@ function rankCard(key) {
       h('button', { class: 'btn ghost sm', title: t('games.goal'), onclick: () => rankGoalModal(key) }, goal != null ? t('games.goalShort', { v: tr.fmt(goal) }) : t('games.setGoal')),
       h('button', { class: 'btn ghost sm icon-only', title: t('games.entryHint'), onclick: () => rankEntryModal(key) }, icon('edit', 14)),
     ),
-    h('div', { class: 'meta', style: { marginBottom: '6px' } }, key === 'deadlock' ? t('games.currentRank') : t('games.currentUnit', { unit: tr.unit })),
-    quickEntry(key),
+    rankTop(key),
     p.current == null
       ? empty(goal != null ? t('games.goalNoCurrent', { goal: tr.fmt(goal), what: key === 'deadlock' ? t('games.rankWord') : tr.unit }) : t('games.enterCurrent'))
       : [
-          h('div', { class: 'stat-value' }, tr.fmt(p.current)),
-          h('div', { class: 'muted' }, tr.sub(p.current)),
+          h('div', { class: 'muted rank-sub' }, tr.sub(p.current)),
           h(
             'div',
-            { class: 'meta', style: { margin: '6px 0 10px' } },
+            { class: 'meta', style: { margin: '0 0 8px' } },
             [
               p.change30 != null && t('games.change30', { v: delta(p.change30) }),
               goal != null && (p.toGoal <= 0 ? t('games.goalHit', { goal: tr.fmt(goal) }) : t('games.toGoal', { goal: tr.fmt(goal), left: key === 'deadlock' ? subranks(p.toGoal) : `${Math.round(p.toGoal)} ${tr.unit}` })),
@@ -392,6 +414,8 @@ function rankCard(key) {
               height: 170,
               width: 380,
               format: key === 'deadlock' ? (v) => deadlockName(v).split(' ')[0] : (v) => compact(v),
+              // One tick per Deadlock tier, so a tier name never repeats on the axis.
+              step: key === 'deadlock' ? 6 : null,
               labelEvery: Math.ceil(sorted.length / 6),
             }),
           h(
@@ -420,7 +444,7 @@ function ranksTab() {
     notes.length > 0 &&
       h(
         'div',
-        { class: 'row', style: { marginTop: '16px' } },
+        { class: 'row gap-t' },
         h('button', { class: 'btn', onclick: () => go('grok', { prompt: t('prompt.gameNotes', { notes: notes.slice(-30).join('\n') }) }) }, icon('spark', 16), t('games.grokRepeat')),
       ),
   ];
@@ -486,13 +510,13 @@ function clipsTab() {
   return [
     h(
       'div',
-      { class: 'grid cols-4', style: { marginBottom: '16px' } },
+      { class: 'grid cols-4 gap-b' },
       tile(t('clips.totalViews'), compact(st.total), t('clips.publishedAvg', { n: st.published, avg: compact(st.avg) }), true),
       ...PLATFORMS.map(([k, label]) => tile(label, compact(st.byPlatform[k]), st.best && clipViews(st.best) ? null : t('clips.viewsHint'))),
     ),
     h(
       'div',
-      { class: 'kanban kanban-4', style: { marginBottom: '16px' } },
+      { class: 'kanban kanban-4 gap-b' },
       CLIP_STATUSES.map(([k], idx) => {
         const list = clips.filter((c) => c.status === k).sort((a, b) => (k === 'published' ? clipViews(b) - clipViews(a) : 0));
         return h(
@@ -553,7 +577,7 @@ export function gamesView() {
     h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, t('nav.games')), h('div', { class: 'sub' }, t('games.sub')))),
     h(
       'div',
-      { class: 'seg', style: { marginBottom: '18px' } },
+      { class: 'seg gap-b' },
       TABS.map((k) => h('button', { class: tab === k ? 'on' : '', 'data-tab': k, onclick: () => ((tab = k), rerender()) }, t(`games.tab.${k}`))),
     ),
     ...body,

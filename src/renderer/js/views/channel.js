@@ -20,7 +20,7 @@ const CH_TABS = ['stats', 'plan', 'ads'];
 function channelTabs() {
   return h(
     'div',
-    { class: 'seg', style: { marginBottom: '18px' } },
+    { class: 'seg gap-b' },
     CH_TABS.map((k) => h('button', { class: chTab === k ? 'on' : '', 'data-tab': k, onclick: () => ((chTab = k), rerender()) }, t(`channel.tab.${k}`))),
   );
 }
@@ -194,7 +194,7 @@ function channelSwitcher(ch) {
   const list = state.data.channels;
   return h(
     'div',
-    { class: 'row', style: { marginBottom: '18px', flexWrap: 'wrap' } },
+    { class: 'row gap-b', style: { flexWrap: 'wrap' } },
     list.length > 1 &&
       h(
         'div',
@@ -263,7 +263,7 @@ export function channelView() {
     channelTabs(),
     h(
       'div',
-      { class: 'grid cols-4', style: { marginBottom: '16px' } },
+      { class: 'grid cols-4 gap-b' },
       tile(t('channel.subscribers'), compact(subs), d7 ? fmtDelta(d7) : fmtDelta(d30), true),
       tile(t('channel.avgReach7'), w7.avgViews ? compact(w7.avgViews) : '—', t('channel.for30', { v: w30.avgViews ? compact(w30.avgViews) : '—' })),
       tile(t('channel.err30'), subs && w30.avgViews ? pct(w30.avgViews / subs) : '—', t('channel.errHint')),
@@ -271,7 +271,7 @@ export function channelView() {
     ),
     h(
       'div',
-      { class: 'grid cols-2', style: { marginBottom: '16px' } },
+      { class: 'grid cols-2 gap-b' },
       card(
         t('channel.subscribers'),
         h('button', { class: 'btn ghost sm', onclick: snapshotModal }, icon('plus', 15), t('channel.addManually')),

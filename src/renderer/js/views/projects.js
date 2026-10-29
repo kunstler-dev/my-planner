@@ -168,7 +168,7 @@ export function projectsView() {
     ),
     h(
       'div',
-      { class: 'grid cols-3', style: { marginBottom: '16px' } },
+      { class: 'grid cols-3 gap-b' },
       h('div', { class: 'card stat dark' }, h('div', { class: 'stat-label' }, t('project.earned')), h('div', { class: 'stat-value' }, money(income)), h('div', { class: 'stat-note' }, t('project.profitNote', { amount: money(profit, { sign: true }) }))),
       h('div', { class: 'card stat' }, h('div', { class: 'stat-label' }, t('project.timeSpent')), h('div', { class: 'stat-value' }, t('project.hoursValue', { v: num(hours) })), h('div', { class: 'stat-note' }, t('project.count', { n: projects.length }))),
       h('div', { class: 'card stat' }, h('div', { class: 'stat-label' }, t('project.avgHour')), h('div', { class: 'stat-value' }, hours ? money(profit / hours) : '—'), h('div', { class: 'stat-note' }, t('project.profitPerHour'))),

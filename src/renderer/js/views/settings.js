@@ -15,7 +15,7 @@ function seg(options, value, onPick) {
   return h(
     'div',
     { class: 'seg' },
-    options.map(([k, label]) => h('button', { type: 'button', class: value === k ? 'on' : '', onclick: () => onPick(k) }, label)),
+    options.map(([k, label]) => h('button', { type: 'button', class: value === k ? 'on' : '', 'data-value': String(k), onclick: () => onPick(k) }, label)),
   );
 }
 
@@ -313,6 +313,18 @@ export function settingsView() {
               ],
               s.theme,
               setTheme,
+            ),
+          ),
+          settingRow(
+            t('settings.density'),
+            t('settings.densityHint'),
+            seg(
+              [
+                ['compact', t('settings.compact')],
+                ['spacious', t('settings.spacious')],
+              ],
+              s.density,
+              (v) => update((d) => (d.settings.density = v)),
             ),
           ),
           mediaRow('background', t('settings.background'), t('settings.backgroundHint')),
