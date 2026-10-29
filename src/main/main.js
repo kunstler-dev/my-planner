@@ -10,6 +10,7 @@ const { createSecrets } = require('./secrets');
 const { streamChat, listModels } = require('./grok');
 const { validAddress, walletBalances } = require('./wallet');
 const { createMono } = require('./mono');
+const { createPin } = require('./pin');
 const { fetchMail, grokMailMessages, validEmail, validDomain } = require('./mail');
 
 if (process.env.PLANNER_DATA_DIR) app.setPath('userData', process.env.PLANNER_DATA_DIR);
@@ -148,6 +149,8 @@ function createWindow() {
 
 function showWindow() {
   if (!win) return;
+  // Opening from the tray: the page locks itself if it was idle long enough.
+  win.webContents.send('app:command', { cmd: 'shown' });
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();
@@ -577,6 +580,26 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('mono:statement', (_e, account, from, to) => mono.statement(account, from, to));
+
+  // PIN: hashed and checked here; the page only learns ok / wait.
+  const pin = createPin(dir, secrets);
+  ipcMain.handle('pin:has', () => pin.has());
+  ipcMain.handle('pin:verify', (_e, value) => pin.verify(String(value ?? '').slice(0, 8)));
+  ipcMain.handle('pin:set', (_e, next, current) => pin.set(next == null ? null : String(next).slice(0, 8), current == null ? null : String(current).slice(0, 8)));
+
+  // Update check: the latest GitHub release of this repository (the portable build only reports it).
+  ipcMain.handle('app:latestRelease', async () => {
+    try {
+      const res = await fetch('https://api.github.com/repos/kunstler-dev/my-planner/releases/latest', { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Planner' }, signal: AbortSignal.timeout(15000) });
+      if (res.status === 404) return { ok: true, none: true };
+      if (!res.ok) return { ok: false, error: 'http' };
+      const j = await res.json();
+      return { ok: true, tag: String(j.tag_name || '').slice(0, 40), url: String(j.html_url || '').slice(0, 300), name: String(j.name || '').slice(0, 120) };
+    } catch (err) {
+      return { ok: false, error: 'network', message: err.message };
+    }
+  });
+  ipcMain.handle('app:openRelease', (_e, url) => (/^https:\/\/github\.com\/kunstler-dev\/my-planner\/releases\//.test(String(url)) ? shell.openExternal(url) : false));
 
   // The renderer may only ask whether a secret exists and replace it; values never leave the main process.
   // The PIN will get its own handler (stored as a hash), so it is not settable here.

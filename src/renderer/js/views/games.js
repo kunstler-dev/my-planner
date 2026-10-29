@@ -64,6 +64,10 @@ function tile(label, value, note, dark, onclick) {
   );
 }
 
+export function setGamesTab(x) {
+  tab = x;
+}
+
 // ---- wishlist ----
 
 export async function refreshPrices({ silent = false } = {}) {
@@ -180,7 +184,7 @@ function wishRow(i) {
   const hit = i.price != null && i.target > 0 && i.price <= i.target;
   return h(
     'div',
-    { class: 'list-row wish-row' },
+    { class: 'list-row wish-row', 'data-id': i.id },
     h('img', { src: i.image, class: 'capsule', width: 120, height: 45, alt: '' }),
     h(
       'div',

@@ -175,6 +175,8 @@ export function createPetCorner() {
   const ball = { x: 0.6, v: 0 };
   const dogState = { awake: 0, target: 0, next: 6 + Math.random() * 6, until: 0, look: 0 };
   let hover = false;
+  // 'happy' | 'sad' | 'sleepy' | 'neutral' (pet-mood.js): reuses the poses, adds only a hop and a slow, low walk.
+  let mood = 'neutral';
   let time = 0;
   let earTwitch = 0;
   let nextTwitch = 4;
@@ -256,6 +258,8 @@ export function createPetCorner() {
       dogState.look = (Math.random() - 0.5) * 1.2;
     }
     if (time > dogState.until && !hover) dogState.target = 0;
+    if (mood === 'happy') dogState.target = 1;
+    if (mood === 'sleepy' && !hover) dogState.target = 0;
     if (hover) dogState.target = 1;
     dogState.awake = lerp(dogState.awake, dogState.target, 1 - Math.exp(-dt * 4));
     const a = dogState.awake;
@@ -293,9 +297,18 @@ export function createPetCorner() {
     setHover(v) {
       hover = v;
     },
+    setMood(m) {
+      mood = m;
+    },
     tick(dt) {
       time += dt;
-      stepPlayer(dt);
+      // Sad and sleepy pets move slower.
+      stepPlayer(mood === 'sad' ? dt * 0.5 : mood === 'sleepy' ? dt * 0.3 : dt);
+      if (mood === 'happy') player.root.position.y += Math.abs(Math.sin(time * 6)) * 0.12;
+      if (mood === 'sad') {
+        player.root.position.y -= 0.06;
+        player.head.rotation.z = lerp(player.head.rotation.z, -0.25, 0.1);
+      } else player.head.rotation.z = lerp(player.head.rotation.z, 0, 0.1);
       stepDog(dt);
       stepSleeper(dt);
       renderer.render(scene, camera);

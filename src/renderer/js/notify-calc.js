@@ -112,6 +112,9 @@ export function dueNotifications(data, now = new Date()) {
   if (s.review !== false && now.getDay() === 0 && now.getHours() * 60 + now.getMinutes() >= (toMinutes(data.settings.reviewAt) ?? 19 * 60)) {
     out.push({ id: `review:${today}`, once: true, type: 'review', view: 'review', key: 'notify.review', params: {} });
   }
+  if (s.update !== false && data.update?.version) {
+    out.push({ id: `update:${data.update.version}`, once: true, type: 'update', view: 'settings', key: 'notify.update', params: { version: data.update.version } });
+  }
   if (s.habits !== false && (data.habits || []).length) {
     const at = toMinutes(s.habitsAt) ?? 20 * 60;
     const open = data.habits.filter((hb) => !(hb.days || []).includes(today));

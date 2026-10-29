@@ -4,6 +4,7 @@ import { h } from './ui.js';
 import { state } from './state.js';
 import { createPetCorner } from './pets3d.js';
 import { t } from './i18n.js';
+import { petMood } from './pet-mood.js';
 
 let el = null;
 let scene = null;
@@ -58,7 +59,11 @@ export function petCorner() {
     setTimeout(buildScene, 300);
   }
   const s = state.data.settings;
-  el.title = t('pets.title');
+  // Mood from the day: the tooltip says why.
+  const { mood, reason } = petMood(state.data, new Date());
+  el.title = `${t('pets.title')} — ${t(reason)}`;
+  el.dataset.mood = mood;
+  scene?.setMood?.(mood);
   el.hidden = s.pets === false;
   el.classList.toggle('mono', !s.petsColor);
   if (el.hidden) stop();

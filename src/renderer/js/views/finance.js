@@ -23,6 +23,14 @@ export function financeTabs() {
   );
 }
 
+/** Shows the operations of a month (search results). */
+export function setFinanceMonth(key) {
+  ui.month = key;
+  ui.tab = 'ops';
+  ui.filter = 'all';
+  ui.query = '';
+}
+
 export function openFinanceTab(tab) {
   ui.tab = tab;
 }
@@ -141,7 +149,7 @@ export function entryModal(entry) {
 export function opRow(row) {
   return h(
     'div',
-    { class: 'op-row', onclick: row.onclick, title: row.note || null },
+    { class: 'op-row', 'data-id': row.id || null, onclick: row.onclick, title: row.note || null },
     h('span', { class: 'op-date' }, row.date ? shortDate(row.date) : ''),
     h('span', { class: 'op-cat' }, row.title),
     h('span', { class: 'op-note' }, row.note || ''),
@@ -172,7 +180,7 @@ export function opList(rows) {
 
 /** A finance entry as an opRow. */
 export function entryOp(e) {
-  return { date: e.date, title: catLabel(e.category), note: e.note, amount: e.type === 'income' ? e.amount : -e.amount, onclick: () => entryModal(e) };
+  return { id: e.id, date: e.date, title: catLabel(e.category), note: e.note, amount: e.type === 'income' ? e.amount : -e.amount, onclick: () => entryModal(e) };
 }
 
 function statTile(label, value, note, dark) {

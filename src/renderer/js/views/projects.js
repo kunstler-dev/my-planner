@@ -88,6 +88,12 @@ function timerButton(p) {
 }
 
 function projectCard(p) {
+  const el = projectCardBody(p);
+  el.dataset.id = p.id;
+  return el;
+}
+
+function projectCardBody(p) {
   const st = projectStats(p, state.data.finance);
   const quick = h('input', { class: 'input', placeholder: t('project.milestonePh'), style: { flex: 1, height: '32px' } });
   return card(
