@@ -1876,3 +1876,41 @@ html.quick-mode body {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
+
+/* ---- stage 6: OpenDota ---- */
+.dota-head {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.dota-matches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 20px;
+}
+.dota-match {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.dota-result {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1.5px solid var(--muted);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.dota-match.win .dota-result {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--invert);
+}

@@ -29,6 +29,8 @@ import {
   clipStats,
 } from '../games-calc.js';
 import { go } from '../app.js';
+import { medalFromRankTier, matchRows, winRate, topHeroes } from '../games-calc.js';
+import { syncDota, importWishlist, isGamesSyncing } from '../games-sync.js';
 
 let tab = 'wishlist';
 let refreshing = false;
@@ -205,6 +207,8 @@ function wishRow(i) {
       i.price == null ? h('div', { class: 'meta' }, t('games.noPrice')) : [i.discount > 0 && h('div', { class: 'meta strike' }, fmtPrice(i.initial, i.currency)), h('div', { class: 'amount' }, priceText(i.price, i.currency))],
     ),
     h('button', { class: 'btn ghost sm icon-only', title: t('games.targetHint'), onclick: () => targetModal(i) }, icon('edit', 15)),
+    i.steamRemoved && h('span', { class: 'badge', title: t('wishlist.removedHint') }, t('wishlist.removed')),
+    i.steamRemoved && h('button', { class: 'btn ghost sm', onclick: () => update((d) => (d.wishlist = d.wishlist.filter((x) => x.id !== i.id))) }, t('common.delete')),
     h('a', { class: 'btn ghost sm icon-only', title: t('games.openSteam'), href: `https://store.steampowered.com/app/${i.id}/`, target: '_blank' }, icon('up', 15)),
   );
 }
@@ -230,6 +234,7 @@ function wishlistTab() {
         'div',
         { class: 'row' },
         h('button', { class: 'btn sm', disabled: refreshing || !items.length, onclick: () => refreshPrices() }, icon('refresh', 14), refreshing ? t('games.checking') : t('games.prices')),
+        state.data.settings.steamId && h('button', { class: 'btn sm', disabled: isGamesSyncing('wishlist'), onclick: () => importWishlist({ silent: false }) }, icon('download', 14), isGamesSyncing('wishlist') ? t('games.checking') : t('wishlist.import')),
         h('button', { class: 'btn primary sm', onclick: searchModal }, icon('plus', 14), t('games.game')),
       ),
       items.length ? h('div', { class: 'list' }, sorted.map(wishRow)) : empty(t('games.wishEmpty')),
@@ -447,10 +452,53 @@ function rankCard(key) {
   );
 }
 
+/** Dota 2 from OpenDota: medal from rank_tier, win rate for 30 days, top heroes and the last 20 matches. */
+function dotaCard() {
+  const dota = state.data.dota;
+  const id = state.data.settings.steamId;
+  const updateBtn = id && h('button', { class: 'btn ghost sm', disabled: isGamesSyncing('dota'), onclick: () => syncDota({ silent: false }) }, icon('refresh', 14), isGamesSyncing('dota') ? t('games.checking') : t('common.update'));
+  if (!id) return card(t('dota.title'), null, h('p', { class: 'muted', style: { margin: 0 } }, t('dota.noProfile')), h('button', { class: 'btn sm', style: { marginTop: '8px' }, onclick: () => go('settings') }, t('dota.toSettings')));
+  const medal = medalFromRankTier(dota.profile?.rankTier);
+  const rate = winRate(dota.wl);
+  const rows = matchRows(dota.matches, dota.heroes);
+  const heroes = topHeroes(dota.matches, dota.heroes);
+  const noData = dota.fetchedAt && !rows.length;
+  return card(
+    t('dota.title'),
+    updateBtn,
+    h(
+      'div',
+      { class: 'dota-head' },
+      h('div', {}, h('div', { class: 'meta' }, t('dota.medal')), h('div', { class: 'stat-value' }, medal ? (medal.star ? `${t(`medal.${MEDAL_KEYS[medal.medal]}`)} ${medal.star}` : t(`medal.${MEDAL_KEYS[medal.medal]}`)) : '—')),
+      h('div', {}, h('div', { class: 'meta' }, t('dota.winrate')), h('div', { class: 'stat-value' }, rate != null ? `${Math.round(rate * 100)}%` : '—'), dota.wl && h('div', { class: 'meta' }, t('dota.wl', { win: dota.wl.win, lose: dota.wl.lose }))),
+      h('div', { class: 'grow' }, h('div', { class: 'meta' }, t('dota.topHeroes')), heroes.length ? heroes.map((x) => h('div', {}, h('b', {}, x.hero), h('span', { class: 'meta' }, ` · ${t('dota.games', { n: x.games })} · ${Math.round((x.wins / x.games) * 100)}%`))) : '—'),
+    ),
+    noData || dota.error === 'http' ? h('p', { class: 'meta', style: { margin: '8px 0' } }, t('dota.private')) : null,
+    rows.length > 0 &&
+      h(
+        'div',
+        { class: 'dota-matches' },
+        rows.map((m) =>
+          h(
+            'div',
+            { class: `dota-match${m.win ? ' win' : ''}` },
+            h('span', { class: 'dota-result' }, m.win ? t('dota.win') : t('dota.loss')),
+            h('span', { class: 'grow title' }, m.hero),
+            h('span', { class: 'num' }, `${m.k}/${m.d}/${m.a}`),
+            h('span', { class: 'meta num' }, t('dota.minutes', { n: m.minutes })),
+            h('span', { class: 'meta' }, prettyDate(m.date)),
+          ),
+        ),
+      ),
+    dota.fetchedAt > 0 && h('div', { class: 'meta', style: { marginTop: '6px' } }, t('dota.fetched', { time: new Date(dota.fetchedAt).toLocaleString(locale(), { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) })),
+  );
+}
+
 function ranksTab() {
   const notes = ['dota', 'faceit', 'deadlock'].flatMap((k) => state.data.ranks[k].entries.filter((e) => e.note).map((e) => `- ${TRACKS[k].title()}, ${e.date}: ${e.note}`));
   return [
     h('div', { class: 'grid cols-3', style: { alignItems: 'start' } }, rankCard('dota'), rankCard('faceit'), rankCard('deadlock')),
+    h('div', { class: 'gap-t' }, dotaCard()),
     notes.length > 0 &&
       h(
         'div',

@@ -147,3 +147,74 @@ export function clipStats(clips) {
   const best = [...published].sort((a, b) => clipViews(b) - clipViews(a))[0] || null;
   return { published: published.length, inWork: clips.length - published.length, total, byPlatform, avg: published.length ? total / published.length : 0, best };
 }
+
+// ---- Steam profile and OpenDota ----
+
+const STEAM64_BASE = 76561197960265728n;
+
+/** «https://steamcommunity.com/id/name/», «…/profiles/7656…», a bare SteamID64 or a name → { id64 } | { vanity } | null. */
+export function parseSteamProfile(input) {
+  const s = String(input || '').trim();
+  const profiles = s.match(/steamcommunity\.com\/profiles\/(\d{17})/i) || s.match(/^(\d{17})$/);
+  if (profiles) return { id64: profiles[1] };
+  const vanity = s.match(/steamcommunity\.com\/id\/([\w-]{2,64})/i) || s.match(/^([A-Za-z][\w-]{1,63})$/);
+  return vanity ? { vanity: vanity[1] } : null;
+}
+
+/** Dota account_id = SteamID64 − 76561197960265728. */
+export const dotaAccountId = (id64) => (/^\d{17}$/.test(String(id64)) ? Number(BigInt(id64) - STEAM64_BASE) : null);
+
+/** OpenDota rank_tier (54 = Legend 4, 80 = Immortal) → { medal: index into MEDAL_KEYS, star } or null. */
+export function medalFromRankTier(rankTier) {
+  const n = Number(rankTier);
+  if (!Number.isInteger(n) || n < 11) return null;
+  const medal = Math.floor(n / 10) - 1;
+  if (medal < 0 || medal > 7) return null;
+  return { medal, star: medal === 7 ? null : Math.min(5, Math.max(1, n % 10)) };
+}
+
+/** Player slot under 128 = Radiant. */
+export const matchWon = (m) => (Number(m.player_slot) < 128) === !!m.radiant_win;
+
+/** Compact match rows: hero, win, K/D/A, duration in minutes, date. */
+export function matchRows(matches, heroes = {}) {
+  return (matches || []).slice(0, 20).map((m) => ({
+    id: m.match_id,
+    hero: heroes[m.hero_id] || `#${m.hero_id}`,
+    win: matchWon(m),
+    k: m.kills,
+    d: m.deaths,
+    a: m.assists,
+    minutes: Math.round((Number(m.duration) || 0) / 60),
+    date: new Date((Number(m.start_time) || 0) * 1000).toISOString().slice(0, 10),
+  }));
+}
+
+/** Win rate from /wl: { win, lose } → 0..1 or null. */
+export const winRate = (wl) => (wl && wl.win + wl.lose > 0 ? wl.win / (wl.win + wl.lose) : null);
+
+/** The three most played heroes in the recent matches: [{ hero, games, wins }]. */
+export function topHeroes(matches, heroes = {}, n = 3) {
+  const map = new Map();
+  for (const m of matches || []) {
+    const x = map.get(m.hero_id) || { hero: heroes[m.hero_id] || `#${m.hero_id}`, games: 0, wins: 0 };
+    x.games++;
+    if (matchWon(m)) x.wins++;
+    map.set(m.hero_id, x);
+  }
+  return [...map.values()].sort((a, b) => b.games - a.games || b.wins - a.wins).slice(0, n);
+}
+
+/**
+ * Steam wishlist vs the planner's: { add: app ids to add, removed: ids of items imported from Steam that are no
+ * longer there (only marked, never deleted), back: ids that are on the Steam list again }.
+ */
+export function wishlistDiff(items, steamIds) {
+  const steam = new Set(steamIds.map(Number));
+  const mine = new Set(items.map((i) => Number(i.id)));
+  return {
+    add: [...steam].filter((id) => !mine.has(id)),
+    removed: items.filter((i) => i.fromSteam && !steam.has(Number(i.id)) && !i.steamRemoved).map((i) => i.id),
+    back: items.filter((i) => i.steamRemoved && steam.has(Number(i.id))).map((i) => i.id),
+  };
+}

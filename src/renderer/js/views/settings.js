@@ -12,6 +12,7 @@ import { checkMono, syncMono, isSyncing, monoErrorText } from '../account-sync.j
 import { monoLabel } from './accounts.js';
 import { checkMail, isMailChecking, mailRules, mailErrorText, scheduleMail } from '../mail-sync.js';
 import { DEFAULT_MAIL_RULES } from '../mail-parse.js';
+import { resolveSteamProfile, syncDota } from '../games-sync.js';
 import { catLabel } from '../labels.js';
 import { categories } from './finance.js';
 import { formModal } from '../modal.js';
@@ -250,6 +251,35 @@ function mailRuleModal(rule) {
       onDelete: isNew ? null : () => saveRules((list) => list.filter((r) => r.id !== rule.id)),
     },
   );
+}
+
+/** Steam profile for OpenDota (Dota medal and matches) and the wishlist import. */
+function gamesCard() {
+  const s = state.data.settings;
+  const input = h('input', { class: 'input', value: s.steamId, placeholder: t('steam.profilePh'), style: { width: '300px' } });
+  const save = async () => {
+    const v = input.value.trim();
+    if (!v) return update((d) => (d.settings.steamId = ''));
+    const res = await resolveSteamProfile(v);
+    if (!res.ok) return toast(t('steam.profileBad'));
+    update((d) => (d.settings.steamId = res.id64));
+    toast(t('steam.profileSaved'));
+    syncDota({ silent: false });
+  };
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && save());
+  const c = card(
+    t('steam.title'),
+    null,
+    h(
+      'div',
+      { class: 'list' },
+      settingRow(t('steam.profile'), s.steamId ? t('steam.profileId', { id: s.steamId }) : t('steam.profileHint'), h('div', { class: 'row' }, input, h('button', { class: 'btn primary', onclick: save }, t('common.save')))),
+      settingRow(t('steam.wishlistSync'), t('steam.wishlistSyncHint'), onOff(s.steamWishlistSync, (v) => update((d) => (d.settings.steamWishlistSync = v)))),
+    ),
+    h('p', { class: 'meta', style: { margin: '8px 4px 0' } }, t('dota.exposeHint')),
+  );
+  c.dataset.section = 'games';
+  return c;
 }
 
 function mailCard() {
@@ -692,6 +722,7 @@ export function settingsView() {
       ),
       monoCard(),
       mailCard(),
+      gamesCard(),
       notificationsCard(),
       card(t('settings.data'), null, h('div', { class: 'list' }, settingRow(t('settings.whereStored'), t('settings.whereStoredHint'), h('button', { class: 'btn', onclick: () => window.api.openDataDir() }, t('settings.openFolder'))))),
       backupsCard(),
