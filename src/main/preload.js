@@ -33,6 +33,13 @@ contextBridge.exposeInMainWorld('api', {
     clientInfo: () => ipcRenderer.invoke('mono:clientInfo'),
     statement: (account, from, to) => ipcRenderer.invoke('mono:statement', account, from, to),
   },
+  quick: {
+    add: (entry) => ipcRenderer.invoke('quick:add', entry),
+    close: () => ipcRenderer.invoke('quick:close'),
+    setKey: (accel) => ipcRenderer.invoke('quick:setKey', accel),
+    open: () => ipcRenderer.invoke('quick:open'),
+    status: () => ipcRenderer.invoke('quick:status'),
+  },
   backups: {
     list: () => ipcRenderer.invoke('backups:list'),
     restore: (name) => ipcRenderer.invoke('backups:restore', name),

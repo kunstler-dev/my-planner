@@ -21,6 +21,7 @@ let keySet = null;
 let backups = null;
 let monoSet = null;
 let imapSet = null;
+let quickStatus = null;
 let rulesOpen = false;
 let backupsAt = 0;
 
@@ -353,6 +354,29 @@ function mailCard() {
   return c;
 }
 
+/** Global shortcut for the quick entry window; only saved when Windows lets the planner register it. */
+function quickKeyControl(s) {
+  if (quickStatus === null) {
+    quickStatus = { ok: true };
+    window.api.quick.status().then((st) => {
+      quickStatus = st;
+      if (!st.ok && state.view === 'settings') update(() => {});
+    });
+  }
+  const input = h('input', { class: 'input', value: s.quickKey, style: { width: '170px' }, placeholder: 'Ctrl+Alt+Space' });
+  const apply = async () => {
+    const v = input.value.trim().replace(/\s*\+\s*/g, '+');
+    if (!v || v === s.quickKey) return;
+    if (await window.api.quick.setKey(v)) {
+      quickStatus = { key: v, ok: true };
+      update((d) => (d.settings.quickKey = v));
+      toast(t('quick.keySaved', { key: v }));
+    } else toast(t('quick.keyBusy', { key: v }));
+  };
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && apply());
+  return h('div', { class: 'row' }, input, h('button', { class: 'btn', onclick: apply }, t('common.save')), h('button', { class: 'btn ghost', onclick: () => window.api.quick.open() }, t('quick.try')));
+}
+
 function notificationsCard() {
   const n = state.data.settings.notify;
   const type = (key) => settingRow(t(`settings.notify.${key}`), t(`settings.notify.${key}Hint`), onOff(n[key], (v) => setNotify(key, v)));
@@ -368,6 +392,8 @@ function notificationsCard() {
       type('habits'),
       type('bills'),
       type('alerts'),
+      type('contracts'),
+      type('steam'),
       n.habits && settingRow(t('settings.notify.habitsAt'), null, timeInput(n.habitsAt, (v) => setNotify('habitsAt', v))),
       settingRow(
         t('settings.quietHours'),
@@ -528,6 +554,7 @@ export function settingsView() {
           ),
           settingRow(t('settings.closeToTray'), t('settings.closeToTrayHint'), onOff(s.closeToTray, (v) => update((d) => (d.settings.closeToTray = v)))),
           settingRow(t('settings.autoStart'), t('settings.autoStartHint'), onOff(s.autoStart, (v) => update((d) => (d.settings.autoStart = v)))),
+          settingRow(t('quick.key'), quickStatus && !quickStatus.ok ? `⚠ ${t('quick.keyBusy', { key: s.quickKey })}` : t('quick.keyHint'), quickKeyControl(s)),
         ),
       ),
       card(

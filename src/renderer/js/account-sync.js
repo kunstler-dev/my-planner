@@ -10,6 +10,7 @@ import { MINUTE } from './notify-calc.js';
 import { CURRENCY, importStatement, statementWindows, nextFrom, jarContribution } from './mono-import.js';
 import { pruneInbox } from './inbox.js';
 import { scheduleMail } from './mail-sync.js';
+import { refreshPrices } from './views/games.js';
 
 const running = new Set();
 export const isSyncing = (key) => running.has(key);
@@ -162,6 +163,16 @@ export async function checkMono() {
 
 export const monoErrorText = (code) => t(`mono.error.${['no_token', 'bad_token', 'rate', 'network'].includes(code) ? code : 'http'}`);
 
+/** Opening Accounts refreshes wallets whose balance is older than 2 minutes. */
+let lastLook = 0;
+// Set once background updates start for real (never in demo runs).
+let live = false;
+export function refreshStaleWallets() {
+  if (!live || Date.now() - lastLook < 60000) return;
+  lastLook = Date.now();
+  for (const a of trustAccounts()) if (!a.sync.lastSync || Date.now() - a.sync.lastSync > 2 * MINUTE) syncTrust(a.id);
+}
+
 /** Refresh one account by its «Update» button. */
 export function syncAccount(a) {
   if (a.sync?.kind === 'trust') return syncTrust(a.id, { silent: false });
@@ -171,10 +182,14 @@ export function syncAccount(a) {
 export async function startAccountSync() {
   // Demo runs (screenshots) never touch real wallets or the bank.
   if ((await window.api.info()).demo) return;
-  register('wallet', 30 * MINUTE, async () => {
+  live = true;
+  // Near real time: public wallet APIs every 5 minutes; Monobank allows one request a minute, so every 10.
+  register('wallet', 5 * MINUTE, async () => {
     for (const a of trustAccounts()) await syncTrust(a.id);
   });
-  register('mono', 30 * MINUTE, () => syncMono());
+  register('mono', 10 * MINUTE, () => syncMono());
+  // Wishlist prices once a day even when the Games screen isn't opened (target price notifications).
+  register('steam-prices', 24 * 60 * MINUTE, () => refreshPrices({ silent: true }));
   scheduleMail();
   register('inbox-prune', 24 * 60 * MINUTE, () => update((d) => (d.inbox = pruneInbox(d.inbox, today())), { silent: true }));
 }

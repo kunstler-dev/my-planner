@@ -10,7 +10,7 @@ import { today, prettyDate } from '../dates.js';
 import { netWorth, convert, setBalance, ratesFromNbu } from '../planner-calc.js';
 import { accountName, accountNameValue, rateSource as sourceKey } from '../labels.js';
 import { CURRENCY } from '../mono-import.js';
-import { syncAccount, isSyncing } from '../account-sync.js';
+import { syncAccount, isSyncing, refreshStaleWallets } from '../account-sync.js';
 import { validAddress, looksLikeSeed } from '../wallet-check.js';
 
 const curs = () => [
@@ -148,9 +148,10 @@ function monoPicker(selected) {
 
 export const monoLabel = (m) => `${t(`mono.type.${['black', 'white', 'platinum', 'iron', 'fop', 'yellow', 'eAid'].includes(m.type) ? m.type : 'other'}`)}${m.pan ? ` ·· ${m.pan}` : ''} · ${fmt(m.balance / 100, CURRENCY[m.currencyCode])}`;
 
-function accountModal(a) {
+/** kind: open the dialog with this source already chosen («Connect Trust Wallet / Monobank» buttons). */
+function accountModal(a, kind) {
   const isNew = !a;
-  const draft = { name: a ? accountName(a) : '', currency: a?.currency || '€', kind: a?.sync?.kind || 'manual' };
+  const draft = { name: a ? accountName(a) : '', currency: a?.currency || '€', kind: kind || a?.sync?.kind || 'manual' };
   const addresses = [...(a?.sync?.addresses || [])];
   const monoIds = [...(a?.sync?.monoIds || [])];
   const name = h('input', { class: 'input', value: draft.name, placeholder: t('accounts.namePh'), required: true });
@@ -242,12 +243,15 @@ function historySeries(accounts, rates, main) {
 }
 
 const isAuto = (a) => a.sync?.kind === 'trust' || a.sync?.kind === 'mono';
+/** The standard crypto and Ukrainian accounts offer to connect their automatic source while they are manual. */
+const setupKind = (a) => (isAuto(a) ? null : a.id === 'trust' ? 'trust' : a.id === 'ua' ? 'mono' : null);
 
 export function accountsView() {
   const { accounts, rates, settings } = state.data;
   const main = settings.currency;
   const nw = netWorth(accounts, rates, main);
   const series = historySeries(accounts, rates, main);
+  setTimeout(refreshStaleWallets, 0);
   if (!rates.updatedAt || rates.updatedAt < today()) setTimeout(() => sourceKey(rates) !== 'manual' && refreshRates({ silent: true }), 0);
 
   return h(
@@ -308,6 +312,7 @@ export function accountsView() {
                       h('div', { class: 'amount' }, fmt(a.balance, a.currency)),
                       a.currency !== main && h('div', { class: 'meta' }, `≈ ${money(convert(a.balance, a.currency, main, rates))}`),
                     ),
+                    setupKind(a) && h('button', { class: 'btn sm connect-btn', onclick: () => accountModal(a, setupKind(a)) }, icon('plus', 14), t(`sync.connect.${setupKind(a)}`)),
                     isAuto(a) && h('button', { class: 'btn ghost sm icon-only', title: t('common.update'), disabled: isSyncing(a.sync.kind === 'mono' ? 'mono' : `trust:${a.id}`), onclick: () => syncAccount(a) }, icon('refresh', 15)),
                     h('button', { class: 'btn sm', title: isAuto(a) ? t('sync.manualFix') : null, onclick: () => balanceModal(a) }, t('accounts.balance')),
                     h('button', { class: 'btn ghost sm icon-only', title: t('common.edit'), onclick: () => accountModal(a) }, icon('edit', 15)),

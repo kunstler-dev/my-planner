@@ -31,6 +31,10 @@ function demoData() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   };
   const finance = [];
+  const contractStart = () => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 24, now.getDate() + 52);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
   let id = 0;
   const add = (type, amount, category, offset, note = '') => finance.push({ id: `d${id++}`, type, amount, category, date: day(offset), note });
   for (let m = 0; m < 10; m++) {
@@ -77,11 +81,13 @@ function demoData() {
       { id: 'ua', name: 'Украинская карта', currency: '₴', balance: 12500, updatedAt: day(1), history: [{ date: day(20), balance: 9000 }, { date: day(1), balance: 12500 }], sync: { kind: 'mono', monoIds: ['demo-black'], lastSync: Date.now() - 12 * 60000, error: '' } },
       { id: 'de', name: 'Немецкая карта', currency: '€', balance: 1630, updatedAt: day(0), history: [{ date: day(20), balance: 1200 }, { date: day(0), balance: 1630 }] },
     ],
-    budgets: { Еда: 12000, Развлечения: 2000, Транспорт: 4000 },
+    budgets: { Еда: 12000, Развлечения: 2000, Транспорт: 4000, Игры: 60 },
     recurring: [
       { id: 'r1', active: true, type: 'expense', title: 'Аренда', amount: 25000, category: 'Жильё', day: 1, next: day(-4) },
       { id: 'r2', active: true, type: 'expense', title: 'Spotify', amount: 11, category: 'Связь и подписки', day: 2, next: day(-5) },
       { id: 'r3', active: true, type: 'income', title: 'Зарплата', amount: 60000, category: 'Зарплата', day: 25, next: day(-27) },
+      // A phone contract whose cancellation deadline is three weeks away (24 months, one month notice).
+      { id: 'r4', active: true, type: 'expense', title: 'Vodafone', amount: 40, category: 'Связь и подписки', day: 15, next: day(-12), contract: { start: contractStart(), minMonths: 24, notice: { n: 1, unit: 'months' }, renewMonths: 1, endOfMonth: false } },
     ],
     goals: [
       { id: 'g1', title: 'Подушка безопасности', target: 3000, deadline: day(-180), contributions: [{ amount: 900, date: day(30) }] },
@@ -283,6 +289,16 @@ app.on('browser-window-created', (_e, win) => {
           log('grok toast:', await js("document.getElementById('toast')?.textContent"));
           await shot('grok-filled-light');
         }
+      }
+      // The quick entry window: open it, type a line, shoot it.
+      await js(`window.api.quick.open()`);
+      await wait(2500);
+      const quick = BrowserWindow.getAllWindows().find((w) => w !== win && w.webContents.getURL().includes('quick=1'));
+      if (quick) {
+        await quick.webContents.executeJavaScript(`(() => { const i = document.querySelector('.quick-input'); i.value = '${lang === 'de' ? 'Taxi 12 gestern' : lang === 'uk' ? 'таксі 12 вчора' : 'такси 12 вчера'}'; i.dispatchEvent(new Event('input')); })()`);
+        await wait(500);
+        fs.writeFileSync(path.join(out, 'quick-entry.png'), (await quick.webContents.capturePage()).toPNG());
+        quick.hide();
       }
       await click('finance');
       await js(`document.querySelector('main .page-head .btn.primary').click()`);

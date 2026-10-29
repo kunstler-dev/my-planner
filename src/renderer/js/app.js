@@ -1,6 +1,8 @@
 // Boot, sidebar navigation and view switching; the background scheduler, notifications and tray commands.
 import { state, loadState, setRenderer, update } from './state.js';
-import { h, icon, toast } from './ui.js';
+import { h, icon, toast, uid, money } from './ui.js';
+import { CAT } from './finance-calc.js';
+import { quickBoot } from './quick.js';
 import { t, setLang, LANGS, mainStrings } from './i18n.js';
 import { petCorner } from './pets.js';
 import { homeView } from './views/home.js';
@@ -197,6 +199,12 @@ function checkRecurring() {
 function onCommand(msg) {
   if (msg?.cmd === 'go' && VIEWS[msg.view]) go(msg.view);
   else if (msg?.cmd === 'expense' || msg?.cmd === 'income') entryModal({ type: msg.cmd });
+  else if (msg?.cmd === 'add-entry' && msg.entry) {
+    // From the quick entry window: saved here, the only window that writes data.
+    const e = { id: uid(), ...msg.entry, category: msg.entry.category || CAT.other };
+    update((d) => d.finance.push(e));
+    toast(t(e.type === 'income' ? 'finance.incomeSaved' : 'finance.expenseSaved', { amount: money(e.amount) }));
+  }
 }
 
 function render() {
@@ -225,4 +233,6 @@ async function boot() {
   startScheduler();
 }
 
-boot();
+// The quick entry window loads the same page with ?quick=1 and shows only its field.
+if (new URLSearchParams(location.search).get('quick')) quickBoot();
+else boot();

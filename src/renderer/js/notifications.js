@@ -3,7 +3,7 @@ import { state, update } from './state.js';
 import { t } from './i18n.js';
 import { money } from './ui.js';
 import { catLabel } from './labels.js';
-import { today } from './dates.js';
+import { today, prettyDate } from './dates.js';
 import { dueNotifications, shouldNotify, pruneNotified, inQuietHours } from './notify-calc.js';
 
 // Never more than this many at once (the rest come on the next check).
@@ -15,6 +15,9 @@ function texts(n) {
   if (p.spent != null) p.spent = money(p.spent);
   if (p.limit != null) p.limit = money(p.limit);
   if (p.category) p.category = catLabel(p.category);
+  if (p.after != null) p.after = money(p.after);
+  if (p.short != null) p.short = money(p.short);
+  if (p.deadline) p.deadline = prettyDate(p.deadline);
   return { title: t(`${n.key}.title`, p), body: t(`${n.key}.body`, p) };
 }
 

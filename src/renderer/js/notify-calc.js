@@ -1,6 +1,7 @@
 // Pure rules for background checks and notifications (unit-tested): when a task is due, quiet hours, the
 // once-a-day journal and which notifications are due now. Texts are produced by the caller from `key` + `params`.
 import { upcoming, budgetStatus, careerStats, addDaysIso } from './planner-calc.js';
+import { cancelDeadline, gameBudgetFit, atTarget } from './money-calc.js';
 
 export const MINUTE = 60000;
 
@@ -84,6 +85,21 @@ export function dueNotifications(data, now = new Date()) {
     for (const x of data.inbox || []) {
       if (x.kind !== 'alert' || x.status !== 'new') continue;
       out.push({ id: `alert:${x.id}`, once: true, type: 'alerts', view: 'inbox', key: 'notify.alert', params: { title: x.title, sender: x.domain || x.sender || '' } });
+    }
+  }
+  if (s.contracts !== false) {
+    for (const r of data.recurring || []) {
+      const c = r.active && r.contract && cancelDeadline(r.contract, today);
+      if (!c || ![30, 7, 1].includes(c.daysLeft)) continue;
+      out.push({ id: `contract:${r.id}:${c.deadline}:${c.daysLeft}`, once: true, type: 'contracts', view: 'finance', key: 'notify.contract', params: { title: r.title, n: c.daysLeft, deadline: c.deadline } });
+    }
+  }
+  if (s.steam !== false) {
+    for (const g of data.wishlist || []) {
+      if (!atTarget(g) || g.boughtAt) continue;
+      const fit = gameBudgetFit(data, g, today);
+      const key = !fit ? 'notify.steam' : fit.fits ? 'notify.steamFits' : 'notify.steamShort';
+      out.push({ id: `steam:${g.id}:${g.price}`, once: true, type: 'steam', view: 'games', key, params: { name: g.name, price: `${g.price} ${g.currency || '₴'}`, after: fit?.after, short: fit?.short } });
     }
   }
   if (s.habits !== false && (data.habits || []).length) {
