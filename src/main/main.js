@@ -1,7 +1,7 @@
 // Electron main process: window, tray, data store with daily backups, named secrets, Windows notifications, Grok
 // (API streaming and the grok.com webview), Telegram page fetch, Steam prices, the user's background/banner media,
 // file export.
-const { app, BrowserWindow, ipcMain, dialog, nativeTheme, shell, session, protocol, net, Tray, Menu, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, nativeTheme, shell, session, protocol, net, Tray, Menu, Notification, globalShortcut } = require('electron');
 const { pathToFileURL } = require('url');
 const fs = require('fs');
 const path = require('path');
@@ -31,6 +31,8 @@ const STEAM = 'https://store.steampowered.com/api';
 const STEAM_CC = 'ua';
 
 let win;
+let quickWin = null;
+let quickKey = null;
 let tray = null;
 let store;
 let secrets;
@@ -155,10 +157,54 @@ function command(cmd) {
   win?.webContents.send('app:command', cmd);
 }
 
+// Quick entry: a small frameless window on top of everything (same preload and CSP as the main window).
+function openQuick() {
+  if (!quickWin || quickWin.isDestroyed()) {
+    const dark = store.load().settings.theme === 'dark';
+    quickWin = new BrowserWindow({
+      width: 420,
+      height: 220,
+      frame: false,
+      resizable: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      show: false,
+      backgroundColor: dark ? '#161616' : '#ffffff',
+      webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false },
+    });
+    quickWin.loadFile(path.join(__dirname, '../renderer/index.html'), { query: { quick: '1' } });
+    quickWin.webContents.on('will-navigate', (e) => e.preventDefault());
+    quickWin.on('blur', () => quickWin?.hide());
+    quickWin.once('ready-to-show', () => (quickWin.center(), quickWin.show(), quickWin.focus()));
+    return;
+  }
+  quickWin.center();
+  quickWin.show();
+  quickWin.focus();
+  quickWin.webContents.send('app:command', { cmd: 'quick-reset' });
+}
+
+/** Registers the global quick-entry shortcut; false when the combination is invalid or taken by another program. */
+function setQuickKey(accel) {
+  const next = String(accel || '').trim().slice(0, 40);
+  if (quickKey === next && globalShortcut.isRegistered(next)) return true;
+  let ok = false;
+  try {
+    ok = !!next && globalShortcut.register(next, openQuick);
+  } catch {
+    ok = false;
+  }
+  if (!ok) return false;
+  if (quickKey && quickKey !== next) globalShortcut.unregister(quickKey);
+  quickKey = next;
+  return true;
+}
+
 function buildTray() {
   const menu = Menu.buildFromTemplate([
     { label: str('main.tray.open', 'Planner'), click: showWindow },
     { type: 'separator' },
+    { label: str('main.tray.quick', 'Quick'), click: openQuick },
     { label: str('main.tray.expense', '+'), click: () => command({ cmd: 'expense' }) },
     { label: str('main.tray.income', '+'), click: () => command({ cmd: 'income' }) },
     { type: 'separator' },
@@ -195,6 +241,7 @@ app.on('second-instance', showWindow);
 app.on('before-quit', () => {
   quitting = true;
 });
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.whenReady().then(() => {
   const dir = app.getPath('userData');
@@ -293,6 +340,23 @@ app.whenReady().then(() => {
     buildTray();
     return true;
   });
+
+  // Quick entry: the small window hands a parsed entry to the main window, which is the only one writing data.
+  ipcMain.handle('quick:add', (_e, entry) => {
+    const type = entry?.type === 'income' ? 'income' : 'expense';
+    const amount = Number(entry?.amount);
+    const date = String(entry?.date || '');
+    if (!(amount > 0 && amount < 1e9) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+    const clean = { type, amount: Math.round(amount * 100) / 100, date, category: String(entry?.category || '').slice(0, 60), note: String(entry?.note || '').slice(0, 200) };
+    win?.webContents.send('app:command', { cmd: 'add-entry', entry: clean });
+    quickWin?.hide();
+    return true;
+  });
+  ipcMain.handle('quick:close', () => quickWin?.hide());
+  ipcMain.handle('quick:setKey', (_e, accel) => setQuickKey(accel));
+  // Whether the saved shortcut is active (another program may own it).
+  ipcMain.handle('quick:status', () => ({ key: quickKey, ok: !!quickKey && globalShortcut.isRegistered(quickKey) }));
+  ipcMain.handle('quick:open', () => openQuick());
 
   // Daily backups: list, restore (current data is kept as data-before-restore-<time>.json first), open the folder.
   ipcMain.handle('backups:list', () => store.backups.list());
@@ -468,6 +532,7 @@ app.whenReady().then(() => {
   ipcMain.handle('grok:abort', (_e, id) => chats.get(id)?.abort());
 
   createWindow();
+  setQuickKey(store.load().settings.quickKey);
 });
 
 app.on('window-all-closed', () => app.quit());

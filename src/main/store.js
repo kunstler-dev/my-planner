@@ -24,7 +24,7 @@ function defaultDocs() {
 
 // Notification types are switched on by default; quiet hours 23:00–08:00.
 function defaultNotify() {
-  return { recurring: true, budget: true, followUp: true, habits: true, bills: true, alerts: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
+  return { recurring: true, budget: true, followUp: true, habits: true, bills: true, alerts: true, contracts: true, steam: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
 }
 
 function defaultData() {
@@ -51,6 +51,8 @@ function defaultData() {
       sidebarCollapsed: false,
       // Gmail (read only): the app password is the secret «imap», never here.
       mail: defaultMail(),
+      // Global shortcut for the quick entry window (Electron accelerator).
+      quickKey: 'Ctrl+Alt+Space',
     },
     // Units of each currency per 1 €; refreshed from the NBU or typed by hand.
     rates: { '€': 1, '₴': 48, $: 1.08, updatedAt: '' },

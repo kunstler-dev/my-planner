@@ -15,6 +15,7 @@ import { netWorth, upcoming, careerStats, budgetStatus } from '../planner-calc.j
 import { catLabel, accountName } from '../labels.js';
 import { layoutOrder, moveCard, toggleHidden, toColumns } from '../home-layout.js';
 import { newItems } from '../inbox.js';
+import { runway, safeToSpend, cancelDeadline } from '../money-calc.js';
 import { gamesCard } from './games.js';
 import { habitRow } from './tasks.js';
 
@@ -132,7 +133,7 @@ export function registerHomeCard(def) {
 
 const hasChannel = () => state.data.channels.length > 0;
 // Default order; the three columns are filled row by row, so this gives tasks + habits | operations + payments | games + channel.
-const DEFAULT_ORDER = ['money', 'month', 'inbox', 'subscribers', 'career', 'tasks', 'recent', 'games', 'habits', 'upcoming', 'channel'];
+const DEFAULT_ORDER = ['money', 'month', 'spend', 'runway', 'inbox', 'subscribers', 'career', 'tasks', 'recent', 'games', 'habits', 'upcoming', 'channel'];
 const knownIds = () => [...DEFAULT_ORDER.filter((id) => CARDS.some((c) => c.id === id)), ...CARDS.map((c) => c.id).filter((id) => !DEFAULT_ORDER.includes(id))];
 
 registerHomeCard({
@@ -175,6 +176,28 @@ registerHomeCard({
   render: () => {
     const cs = careerStats(state.data.career.applications, today());
     return tile(t('home.appsWeek'), 'briefcase', `${cs.week} / ${state.data.career.weeklyGoal}`, cs.followUps.length ? t('home.followUps', { n: cs.followUps.length }) : t('home.sentTotal', { n: cs.sent }), () => go('career'));
+  },
+});
+registerHomeCard({
+  id: 'runway',
+  tile: true,
+  available: () => !!runway(netWorth(state.data.accounts, state.data.rates, state.data.settings.currency).total, state.data.finance, today()),
+  render: () => {
+    const r = runway(netWorth(state.data.accounts, state.data.rates, state.data.settings.currency).total, state.data.finance, today());
+    const el = tile(t('home.runway'), 'card', t('home.runwayValue', { v: num(r.months, { maximumFractionDigits: 1 }) }), t('home.runwayNote', { avg: money(r.avg), n: r.basedOn }), () => go('finance'));
+    el.title = t('home.runwayHint');
+    return el;
+  },
+});
+registerHomeCard({
+  id: 'spend',
+  tile: true,
+  render: () => {
+    const s = safeToSpend(state.data, today());
+    const el = tile(t('home.spend'), 'wallet', money(s.perDay), t('home.spendNote', { n: s.days, date: prettyDate(s.until) }), () => go('finance'));
+    // How it's counted, on hover.
+    el.title = t('home.spendHint', { total: money(s.total), recurring: money(s.recurring), bills: money(s.bills), goals: money(s.goals), n: s.days });
+    return el;
   },
 });
 registerHomeCard({
@@ -226,6 +249,10 @@ registerHomeCard({
       null,
       rows.length ? opList(rows) : empty(t('home.noUpcoming')),
       overBudget.length > 0 && h('div', { class: 'meta', style: { marginTop: '6px' } }, t('home.budgetWarn', { list: overBudget.map((b) => catLabel(b.category)).join(', ') })),
+      ...state.data.recurring
+        .map((r) => [r, r.active && r.contract && cancelDeadline(r.contract, today())])
+        .filter(([, c]) => c && c.daysLeft <= 30)
+        .map(([r, c]) => h('div', { class: 'meta contract-soon', style: { marginTop: '6px' } }, t('home.cancelBy', { title: r.title, date: prettyDate(c.deadline) }))),
     );
   },
 });

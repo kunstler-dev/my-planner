@@ -8,6 +8,7 @@ import { lineChart } from '../charts.js';
 import { today, prettyDate } from '../dates.js';
 import { convert } from '../planner-calc.js';
 import { CAT } from '../finance-calc.js';
+import { gameBudgetFit } from '../money-calc.js';
 import {
   parseSteamAppId,
   applyPrice,
@@ -166,6 +167,13 @@ function targetModal(item) {
   );
 }
 
+/** At the target price: does it fit what's left of this month's «Games» budget? */
+function fitText(i) {
+  const fit = gameBudgetFit(state.data, i, today());
+  if (!fit) return null;
+  return fit.fits ? t('games.fits', { after: money(fit.after) }) : t('games.short', { short: money(fit.short) });
+}
+
 function wishRow(i) {
   const hit = i.price != null && i.target > 0 && i.price <= i.target;
   return h(
@@ -183,6 +191,7 @@ function wishRow(i) {
           i.lowest != null && i.history?.length > 1 && t('games.lowest', { price: fmtPrice(i.lowest, i.currency) }),
           i.target > 0 && (hit ? t('games.targetHit', { price: fmtPrice(i.target, i.currency) }) : t('games.target', { price: fmtPrice(i.target, i.currency) })),
           i.updatedAt && t('games.checked', { date: prettyDate(i.updatedAt) }),
+          hit && fitText(i),
         ]
           .filter(Boolean)
           .join(' · '),

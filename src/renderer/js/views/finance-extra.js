@@ -6,6 +6,7 @@ import { formModal } from '../modal.js';
 import { barList } from '../charts.js';
 import { today, thisMonth, prettyDate, monthTitle, dateTime } from '../dates.js';
 import { inMonth, DEFAULT_CATEGORIES, CAT } from '../finance-calc.js';
+import { cancelDeadline } from '../money-calc.js';
 import { budgetStatus, firstOccurrence, upcoming, recurringMonthly, goalPlan, applyRecurring } from '../planner-calc.js';
 import { catLabel, catValue } from '../labels.js';
 import { financeTabs, categories } from './finance.js';
@@ -121,15 +122,37 @@ function recurringModal(r) {
       { key: 'day', label: t('recurring.day'), type: 'number', required: true, half: true },
       { key: 'category', label: t('common.category'), list: [...new Set([...DEFAULT_CATEGORIES.expense, ...DEFAULT_CATEGORIES.income])].map(catLabel) },
       { key: 'active', label: t('recurring.active'), type: 'checkbox' },
+      // Optional contract block: when the notice has to be given (Kündigungsfrist).
+      { key: 'hasContract', label: t('contract.has'), type: 'checkbox' },
+      { key: 'cStart', label: t('contract.start'), type: 'date', half: true },
+      { key: 'cMin', label: t('contract.minMonths'), type: 'number', half: true },
+      { key: 'cNotice', label: t('contract.notice'), type: 'number', half: true },
+      { key: 'cUnit', label: t('contract.unit'), type: 'select', options: ['days', 'weeks', 'months'].map((u) => [u, t(`contract.unit.${u}`)]), half: true },
+      { key: 'cRenew', label: t('contract.renew'), type: 'number', half: true },
+      { key: 'cEom', label: t('contract.endOfMonth'), type: 'checkbox' },
     ],
-    { ...v, category: catLabel(v.category) },
+    {
+      ...v,
+      category: catLabel(v.category),
+      hasContract: !!v.contract,
+      cStart: v.contract?.start || '',
+      cMin: v.contract?.minMonths ?? '',
+      cNotice: v.contract?.notice?.n ?? '',
+      cUnit: v.contract?.notice?.unit || 'months',
+      cRenew: v.contract?.renewMonths ?? 1,
+      cEom: !!v.contract?.endOfMonth,
+    },
     {
       onSave: (x) => {
         const day = Math.min(31, Math.max(1, Math.round(x.day || 1)));
         if (!(x.amount > 0)) return false;
+        if (x.hasContract && !x.cStart) return toast(t('contract.needStart')), false;
+        const { hasContract, cStart, cMin, cNotice, cUnit, cRenew, cEom, ...fields } = x;
+        const contract = hasContract ? { start: cStart, minMonths: Math.max(0, Math.round(cMin || 0)), notice: { n: Math.max(0, Math.round(cNotice || 0)), unit: cUnit }, renewMonths: Math.max(1, Math.round(cRenew || 1)), endOfMonth: !!cEom } : undefined;
         const rec = {
           ...v,
-          ...x,
+          ...fields,
+          contract,
           day,
           category: catValue(x.category) || (x.type === 'income' ? CAT.other : CAT.subscriptions),
           id: v.id || uid(),
@@ -161,6 +184,13 @@ export function syncRecurring() {
   return res.entries.length;
 }
 
+/** «cancel by …» under a recurring payment with a contract; bold in the last 30 days. */
+export function contractNote(r) {
+  const c = r.contract && cancelDeadline(r.contract, today());
+  if (!c) return null;
+  return h('div', { class: `meta${c.daysLeft <= 30 ? ' contract-soon' : ''}` }, t('contract.cancelBy', { date: prettyDate(c.deadline), end: prettyDate(c.termEnd) }));
+}
+
 export function recurringTab() {
   const list = state.data.recurring;
   const m = recurringMonthly(list);
@@ -174,6 +204,7 @@ export function recurringTab() {
         { class: 'grow' },
         h('div', { class: 'title' }, r.title),
         h('div', { class: 'meta' }, [catLabel(r.category), t('recurring.everyDay', { day: r.day }), r.active ? t('recurring.next', { date: prettyDate(r.next) }) : t('recurring.paused')].join(' · ')),
+        contractNote(r),
       ),
       h('div', { class: `amount${r.type === 'expense' ? ' out' : ''}` }, money(r.type === 'income' ? r.amount : -r.amount, { sign: true })),
     );

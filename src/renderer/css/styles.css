@@ -1809,3 +1809,70 @@ a.btn {
   color: inherit;
   text-decoration: none;
 }
+
+/* ================= Stage 4: quick entry window, contracts, connect buttons ================= */
+html.quick-mode,
+html.quick-mode body {
+  background: var(--card);
+  overflow: hidden;
+}
+.quick {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  -webkit-app-region: drag;
+}
+.quick-title {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 15px;
+}
+.quick-title .muted {
+  font-weight: 500;
+  font-size: 12px;
+}
+.quick-input {
+  height: 48px;
+  font-size: 17px;
+  -webkit-app-region: no-drag;
+}
+.quick-preview {
+  font-size: 14px;
+  min-height: 40px;
+  line-height: 1.4;
+}
+.contract-soon {
+  color: var(--ink) !important;
+  font-weight: 650;
+}
+.connect-btn {
+  border-style: dashed;
+}
+.home-tiles {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* All number tiles in one row; the big numbers shrink a little when there are many. */
+.home-tiles {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+.home-tiles .stat-value {
+  font-size: min(var(--stat-size), 21px);
+  white-space: nowrap;
+}
+.home-tiles .stat-label,
+.home-tiles .stat-note {
+  font-size: 12px;
+}
+@media (max-width: 1099px) {
+  .home-tiles {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}

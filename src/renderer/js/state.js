@@ -1,5 +1,6 @@
 // Single app state; update() saves with a short debounce and re-renders the current view.
-export const state = { data: null, view: 'home' };
+// readOnly: a secondary window (quick entry) that only reads data and must never write its copy back.
+export const state = { data: null, view: 'home', readOnly: false };
 
 let render = () => {};
 let saveTimer;
@@ -13,6 +14,7 @@ export async function loadState() {
 }
 
 export function save() {
+  if (state.readOnly) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => window.api.save(state.data), 250);
 }
@@ -29,6 +31,7 @@ export function rerender() {
 }
 
 window.addEventListener('beforeunload', () => {
+  if (state.readOnly || !state.data) return;
   clearTimeout(saveTimer);
   window.api.save(state.data);
 });
