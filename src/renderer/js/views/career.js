@@ -259,7 +259,7 @@ function appRow(a) {
           : null;
   return h(
     'div',
-    { class: `app-row status-${a.status}${due ? ' due' : ''}` },
+    { class: `app-row status-${a.status}${due ? ' due' : ''}`, 'data-id': a.id },
     statusPill(a),
     h(
       'div',

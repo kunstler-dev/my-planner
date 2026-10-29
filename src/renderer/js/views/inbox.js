@@ -133,7 +133,7 @@ function itemRow(item) {
   const title = item.kind === 'unparsed' ? t('inbox.unparsed', { subject: item.subject || item.title }) : item.title || '—';
   return h(
     'div',
-    { class: `inbox-row kind-${item.kind}`, 'data-kind': item.kind },
+    { class: `inbox-row kind-${item.kind}`, 'data-kind': item.kind, 'data-id': item.id },
     h('span', { class: 'op-date' }, shortDate(item.date)),
     h('div', { class: 'grow', style: { minWidth: 0 } }, h('div', { class: 'title', title }, title, h('span', { class: 'badge', style: { marginLeft: '8px' } }, t(`inbox.kind.${item.kind}`))), h('div', { class: 'meta', title: meta(item) }, meta(item))),
     withCategory ? categorySelect(item) : h('span'),

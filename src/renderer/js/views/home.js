@@ -41,7 +41,7 @@ export function taskRow(task) {
   const overdue = !task.done && task.date < today();
   return h(
     'div',
-    { class: `list-row${task.done ? ' task-done' : ''}` },
+    { class: `list-row${task.done ? ' task-done' : ''}`, 'data-id': task.id },
     h(
       'button',
       {

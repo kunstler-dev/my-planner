@@ -7,7 +7,7 @@ import { today, prettyDate } from '../dates.js';
 
 let query = '';
 
-function noteModal(n) {
+export function noteModal(n) {
   const isNew = !n;
   formModal(
     isNew ? t('notes.new') : t('notes.note'),
@@ -64,7 +64,7 @@ export function notesView() {
           notes.map((n) =>
             h(
               'button',
-              { class: `card note${n.pinned ? ' pinned' : ''}`, onclick: () => noteModal(n) },
+              { class: `card note${n.pinned ? ' pinned' : ''}`, 'data-id': n.id, onclick: () => noteModal(n) },
               n.title && h('h3', {}, n.title),
               h('div', { class: 'note-text' }, n.text),
               h('div', { class: 'meta' }, `${n.pinned ? '📌 ' : ''}${n.updatedAt ? prettyDate(n.updatedAt) : ''}`),

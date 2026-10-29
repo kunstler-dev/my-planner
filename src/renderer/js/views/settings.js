@@ -13,6 +13,8 @@ import { monoLabel } from './accounts.js';
 import { checkMail, isMailChecking, mailRules, mailErrorText, scheduleMail } from '../mail-sync.js';
 import { DEFAULT_MAIL_RULES } from '../mail-parse.js';
 import { resolveSteamProfile, syncDota } from '../games-sync.js';
+import { pinIsSet, setPinState } from '../lock.js';
+import { isNewer } from '../update-calc.js';
 import { catLabel } from '../labels.js';
 import { categories } from './finance.js';
 import { formModal } from '../modal.js';
@@ -23,6 +25,7 @@ let backups = null;
 let monoSet = null;
 let imapSet = null;
 let quickStatus = null;
+let appVersion = '';
 let rulesOpen = false;
 let backupsAt = 0;
 
@@ -427,6 +430,7 @@ function notificationsCard() {
       type('jobs'),
       type('timer'),
       type('review'),
+      type('update'),
       n.review && settingRow(t('settings.notify.reviewAt'), null, timeInput(state.data.settings.reviewAt, (v) => update((d) => (d.settings.reviewAt = v)))),
       n.habits && settingRow(t('settings.notify.habitsAt'), null, timeInput(n.habitsAt, (v) => setNotify('habitsAt', v))),
       settingRow(
@@ -482,6 +486,62 @@ function backupsCard() {
         )
       : h('p', { class: 'meta' }, t('settings.noBackups')),
   );
+}
+
+/** PIN: set, change or remove (changing and removing need the current one). */
+function securityCard() {
+  const s = state.data.settings;
+  const has = pinIsSet();
+  const cur = h('input', { class: 'input', type: 'password', inputmode: 'numeric', maxlength: 8, placeholder: t('pin.current'), style: { width: '130px' } });
+  const next = h('input', { class: 'input', type: 'password', inputmode: 'numeric', maxlength: 8, placeholder: t('pin.new'), style: { width: '130px' } });
+  const again = h('input', { class: 'input', type: 'password', inputmode: 'numeric', maxlength: 8, placeholder: t('pin.again'), style: { width: '130px' } });
+  const result = (res, okText) => {
+    if (res.ok) {
+      toast(okText);
+      return true;
+    }
+    toast(res.error === 'format' ? t('pin.format') : res.wait > 0 ? t('lock.wait', { n: Math.ceil(res.wait / 1000) }) : t('lock.wrong'));
+    return false;
+  };
+  const save = async () => {
+    if (!/^\d{4,8}$/.test(next.value)) return toast(t('pin.format'));
+    if (next.value !== again.value) return toast(t('pin.mismatch'));
+    if (result(await window.api.pin.set(next.value, has ? cur.value : null), t('pin.saved'))) {
+      setPinState(true);
+      update(() => {});
+    }
+  };
+  const remove = async () => {
+    if (result(await window.api.pin.set(null, cur.value), t('pin.removed'))) {
+      setPinState(false);
+      update(() => {});
+    }
+  };
+  const c = card(
+    t('pin.title'),
+    null,
+    h(
+      'div',
+      { class: 'list' },
+      settingRow(
+        has ? t('pin.change') : t('pin.set'),
+        t('pin.hint'),
+        h('div', { class: 'row', style: { flexWrap: 'wrap', justifyContent: 'flex-end' } }, has && cur, next, again, h('button', { class: 'btn primary', onclick: save }, t('common.save')), has && h('button', { class: 'btn ghost', onclick: remove }, t('pin.remove'))),
+      ),
+      settingRow(t('pin.lockAfter'), null, seg([1, 5, 10, 30, 60].map((n) => [n, t('mail.minutes', { n })]), s.lockMinutes, (v) => update((d) => (d.settings.lockMinutes = v)))),
+    ),
+    h('p', { class: 'meta', style: { margin: '8px 4px 0' } }, t('pin.honest')),
+  );
+  c.dataset.section = 'security';
+  return c;
+}
+
+/** «Version X is out» while a newer GitHub release exists. */
+function updateBanner() {
+  const u = state.data.update;
+  if (!appVersion) window.api.info().then((i) => ((appVersion = i.version), state.view === 'settings' && u && update(() => {})));
+  if (!u || !appVersion || !isNewer(u.version, appVersion)) return null;
+  return h('div', { class: 'alert-banner' }, icon('download', 18), h('div', { class: 'grow' }, h('b', {}, t('update.title', { version: u.version })), h('div', { class: 'meta' }, t('update.hint', { current: appVersion }))), h('button', { class: 'btn primary sm', onclick: () => window.api.openRelease(u.url) }, t('update.open')));
 }
 
 export function settingsView() {
@@ -568,6 +628,7 @@ export function settingsView() {
     'div',
     { class: 'page', style: { maxWidth: '820px' } },
     h('div', { class: 'page-head' }, h('h1', {}, t('nav.settings'))),
+    updateBanner(),
     h(
       'div',
       { class: 'stack' },
@@ -723,6 +784,7 @@ export function settingsView() {
           ),
         ),
       ),
+      securityCard(),
       monoCard(),
       mailCard(),
       gamesCard(),

@@ -18,6 +18,12 @@ import { gamesView } from './views/games.js';
 import { grokView } from './views/grok.js';
 import { settingsView } from './views/settings.js';
 import { reviewView } from './views/review.js';
+import { initLock, isLocked, lockScreen, onShown } from './lock.js';
+import { openSearch } from './search.js';
+import { hideGrokWeb } from './grok-web.js';
+import { noteModal } from './views/notes.js';
+import { setFinanceMonth } from './views/finance.js';
+import { setGamesTab } from './views/games.js';
 import { stopTimer, startTimer, syncTray, tickTimerDom } from './timer.js';
 import { autoHabitMarks, elapsedText } from './productivity-calc.js';
 import { today } from './dates.js';
@@ -48,9 +54,37 @@ const NAV = [['home'], ['money', 'finance', 'accounts', 'inbox'], ['work', 'care
 export function go(view, opts) {
   state.view = view;
   state.viewOpts = opts || null;
+  if (opts?.kind === 'entry' && opts.ref) setFinanceMonth(opts.ref);
+  if (opts?.kind === 'game') setGamesTab('wishlist');
   render();
   document.getElementById('main').scrollTop = 0;
+  // From the search: the found item is scrolled into view and blinks.
+  if (opts?.highlight != null) {
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-id="${CSS.escape(String(opts.highlight))}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'center' });
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 2200);
+    });
+  }
 }
+
+const searchActions = () => ({
+  go,
+  expense: () => entryModal({ type: 'expense' }),
+  income: () => entryModal({ type: 'income' }),
+  newNote: () => (go('notes'), noteModal(null)),
+  toggleTheme: () => setTheme(state.data.settings.theme === 'dark' ? 'light' : 'dark'),
+  views: Object.keys(VIEWS),
+});
+
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && state.data && !isLocked()) {
+    e.preventDefault();
+    openSearch(searchActions());
+  }
+});
 
 function navItem(key) {
   const v = VIEWS[key];
@@ -215,6 +249,7 @@ function checkRecurring() {
 function onCommand(msg) {
   if (msg?.cmd === 'go' && VIEWS[msg.view]) go(msg.view);
   else if (msg?.cmd === 'expense' || msg?.cmd === 'income') entryModal({ type: msg.cmd });
+  else if (msg?.cmd === 'shown') onShown();
   else if (msg?.cmd === 'timer-stop') stopTimer();
   else if (msg?.cmd === 'timer-start' && state.data.timerLast) startTimer(state.data.timerLast);
   else if (msg?.cmd === 'add-entry' && msg.entry) {
@@ -239,8 +274,18 @@ function applyAutoHabits() {
 function render() {
   applyLayout();
   applyMedia();
-  renderNav();
   const main = document.getElementById('main');
+  // Locked: only the PIN screen, no section and no menu is drawn.
+  document.documentElement.toggleAttribute('data-locked', isLocked());
+  if (isLocked()) {
+    hideGrokWeb();
+    document.getElementById('nav').replaceChildren();
+    document.getElementById('nav-bottom').replaceChildren();
+    // Background updates re-render often; the PIN field keeps what was typed.
+    if (!main.querySelector('.lock-screen')) main.replaceChildren(lockScreen());
+    return;
+  }
+  renderNav();
   const view = VIEWS[state.view] || VIEWS.home;
   const keepScroll = main.scrollTop;
   main.replaceChildren(view.render());
@@ -253,6 +298,7 @@ async function boot() {
   await adoptMedia();
   applyTheme();
   setRenderer(render);
+  await initLock(render);
   window.api.onCommand(onCommand);
   onDayChange(checkRecurring);
   register('notify', MINUTE, () => checkNotifications());

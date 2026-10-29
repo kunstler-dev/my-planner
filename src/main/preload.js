@@ -14,6 +14,13 @@ contextBridge.exposeInMainWorld('api', {
   setStrings: (dict) => ipcRenderer.invoke('app:strings', dict),
   notify: (msg) => ipcRenderer.invoke('app:notify', msg),
   setTimer: (info) => ipcRenderer.invoke('app:timer', info),
+  pin: {
+    has: () => ipcRenderer.invoke('pin:has'),
+    verify: (value) => ipcRenderer.invoke('pin:verify', value),
+    set: (next, current) => ipcRenderer.invoke('pin:set', next, current),
+  },
+  latestRelease: () => ipcRenderer.invoke('app:latestRelease'),
+  openRelease: (url) => ipcRenderer.invoke('app:openRelease', url),
   /** Tray menu and notification clicks: { cmd: 'go', view } | { cmd: 'expense' } | { cmd: 'income' }. */
   onCommand: (fn) => {
     commandListeners.add(fn);

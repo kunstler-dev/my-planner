@@ -11,6 +11,7 @@ import { CURRENCY, importStatement, statementWindows, nextFrom, jarContribution 
 import { pruneInbox } from './inbox.js';
 import { scheduleMail } from './mail-sync.js';
 import { checkJobs } from './jobs-sync.js';
+import { isNewer } from './update-calc.js';
 import { syncDota, importWishlist } from './games-sync.js';
 import { refreshPrices } from './views/games.js';
 
@@ -175,6 +176,13 @@ export function refreshStaleWallets() {
   for (const a of trustAccounts()) if (!a.sync.lastSync || Date.now() - a.sync.lastSync > 2 * MINUTE) syncTrust(a.id);
 }
 
+export async function checkUpdates() {
+  const [info, res] = [await window.api.info(), await window.api.latestRelease()];
+  if (!res.ok) return;
+  const newer = !res.none && isNewer(res.tag, info.version);
+  update((d) => (d.update = newer ? { version: res.tag.replace(/^v/i, ''), url: res.url, checkedAt: Date.now() } : null), { silent: true });
+}
+
 /** Refresh one account by its «Update» button. */
 export function syncAccount(a) {
   if (a.sync?.kind === 'trust') return syncTrust(a.id, { silent: false });
@@ -197,5 +205,7 @@ export async function startAccountSync() {
   // OpenDota every 2 hours (free tier: 60 requests a minute, four per update); the Steam wishlist daily if on.
   register('dota', 120 * MINUTE, () => syncDota());
   register('steam-wishlist', 24 * 60 * MINUTE, () => (state.data.settings.steamWishlistSync ? importWishlist() : null));
+  // Once a day: is there a newer release on GitHub? (The portable build only reports it.)
+  register('updates', 24 * 60 * MINUTE, checkUpdates);
   register('inbox-prune', 24 * 60 * MINUTE, () => update((d) => (d.inbox = pruneInbox(d.inbox, today())), { silent: true }));
 }

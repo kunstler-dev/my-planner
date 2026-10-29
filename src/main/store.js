@@ -24,7 +24,7 @@ function defaultDocs() {
 
 // Notification types are switched on by default; quiet hours 23:00–08:00.
 function defaultNotify() {
-  return { recurring: true, budget: true, followUp: true, habits: true, bills: true, alerts: true, contracts: true, steam: true, jobs: true, timer: true, review: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
+  return { recurring: true, budget: true, followUp: true, habits: true, bills: true, alerts: true, contracts: true, steam: true, jobs: true, timer: true, review: true, update: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
 }
 
 function defaultData() {
@@ -58,6 +58,8 @@ function defaultData() {
       steamWishlistSync: false,
       // When the weekly review notification comes on Sundays.
       reviewAt: '19:00',
+      // Lock after this many idle minutes when a PIN is set.
+      lockMinutes: 10,
     },
     // Units of each currency per 1 €; refreshed from the NBU or typed by hand.
     rates: { '€': 1, '₴': 48, $: 1.08, updatedAt: '' },
@@ -100,6 +102,8 @@ function defaultData() {
     timerLast: '',
     // Saved weekly reviews { week: Monday, summary, grok }, the newest 52.
     weeklyReviews: [],
+    // The newest release seen by the daily update check: { version, url, checkedAt }.
+    update: null,
     dota: { profile: null, wl: null, matches: [], heroes: {}, fetchedAt: 0, error: '' },
   };
 }
@@ -181,6 +185,7 @@ function normalize(raw) {
     timer: raw.timer && typeof raw.timer === 'object' && raw.timer.projectId && Number(raw.timer.startedAt) > 0 ? { projectId: String(raw.timer.projectId), startedAt: Number(raw.timer.startedAt) } : null,
     timerLast: typeof raw.timerLast === 'string' ? raw.timerLast : '',
     weeklyReviews: arr(raw.weeklyReviews).slice(-52),
+    update: raw.update && typeof raw.update === 'object' ? raw.update : null,
     dota: { profile: null, wl: null, matches: [], heroes: {}, fetchedAt: 0, error: '', ...obj(raw.dota), matches: arr(raw.dota?.matches), heroes: obj(raw.dota?.heroes) },
     jobs: { ...defaultJobs(), ...obj(raw.jobs), searches: arr(raw.jobs?.searches), ignored: arr(raw.jobs?.ignored) },
     mono: { ...defaultMono(), ...obj(raw.mono), accounts: arr(raw.mono?.accounts), jars: arr(raw.mono?.jars), last: obj(raw.mono?.last) },
