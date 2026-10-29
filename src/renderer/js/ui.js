@@ -1,5 +1,6 @@
 // DOM and formatting helpers.
 import { state } from './state.js';
+import { t, locale } from './i18n.js';
 
 /** h('div', { class: 'x', onclick }, child, ...) — tiny element builder. */
 export function h(tag, attrs = {}, ...children) {
@@ -56,6 +57,9 @@ const ICONS = {
   briefcase: 'M4 7h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18',
   rocket: 'M5 15c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1zM12 15l-3-3a22 22 0 0 1 2-4A13 13 0 0 1 22 2c0 2.7-.8 7.5-6 11a22 22 0 0 1-4 2zM9 12H4s.6-3 2-4c1.6-1.1 5 0 5 0M12 15v5s3-.6 4-2c1.1-1.6 0-5 0-5',
   note: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5',
+  globe: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20',
+  bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
   gamepad: 'M6 11h4M8 9v4M15 12h.01M18 10h.01M17.3 5H6.7a4 4 0 0 0-4 3.6l-.7 6.2A3 3 0 0 0 5 18c1 0 1.9-.5 2.4-1.3L9 14h6l1.6 2.7A2.8 2.8 0 0 0 19 18a3 3 0 0 0 3-3.2l-.7-6.2a4 4 0 0 0-4-3.6z',
 };
 export function icon(name, size = 18) {
@@ -79,17 +83,18 @@ export function icon(name, size = 18) {
 export function money(n, { sign = false } = {}) {
   const cur = state.data?.settings.currency || '€';
   const v = Math.round((Number(n) || 0) * 100) / 100;
-  const s = Math.abs(v).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  const s = Math.abs(v).toLocaleString(locale(), { maximumFractionDigits: 2 });
   const pre = v < 0 ? '−' : sign && v > 0 ? '+' : '';
   return `${pre}${s} ${cur}`;
 }
 
-/** 12 345 → «12,3 тыс.» for compact stats. */
+/** 12 345 → «12,3 тыс.» / «12,3 Tsd.» for compact stats. */
 export function compact(n) {
   const v = Number(n) || 0;
-  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} млн`;
-  if (Math.abs(v) >= 1e4) return `${(v / 1e3).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} тыс.`;
-  return Math.round(v).toLocaleString('ru-RU');
+  const f = (x) => x.toLocaleString(locale(), { maximumFractionDigits: 1 });
+  if (Math.abs(v) >= 1e6) return t('num.million', { v: f(v / 1e6) });
+  if (Math.abs(v) >= 1e4) return t('num.thousand', { v: f(v / 1e3) });
+  return Math.round(v).toLocaleString(locale());
 }
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);

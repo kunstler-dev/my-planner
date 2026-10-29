@@ -43,15 +43,26 @@ export function wishlistSummary(items, toMain = (v) => v) {
 
 // ---- ranks ----
 
-const MEDALS = ['Рекрут', 'Страж', 'Рыцарь', 'Герой', 'Легенда', 'Властелин', 'Божество'];
+// Medal keys in order (Herald … Immortal); names come from the language files (medal.<key>).
+export const MEDAL_KEYS = ['herald', 'guardian', 'crusader', 'archon', 'legend', 'ancient', 'divine', 'immortal'];
+const MEDALS_RU = ['Рекрут', 'Страж', 'Рыцарь', 'Герой', 'Легенда', 'Властелин', 'Божество', 'Титан'];
 
-/** Approximate Dota medal for a solo MMR (≈154 MMR per star up to Ancient, 200 per Divine star, Titan from 5620). */
-export function dotaMedal(mmr) {
+/**
+ * Approximate Dota medal for a solo MMR (≈154 MMR per star up to Ancient, 200 per Divine star, Immortal from 5620):
+ * { medal: index into MEDAL_KEYS, star: 1–5 or null for Immortal }.
+ */
+export function dotaMedalParts(mmr) {
   const v = Number(mmr) || 0;
-  if (v >= 5620) return 'Титан';
-  if (v >= 4620) return `Божество ${Math.min(5, Math.floor((v - 4620) / 200) + 1)}`;
+  if (v >= 5620) return { medal: 7, star: null };
+  if (v >= 4620) return { medal: 6, star: Math.min(5, Math.floor((v - 4620) / 200) + 1) };
   const star = Math.floor(v / 154);
-  return `${MEDALS[Math.min(5, Math.floor(star / 5))]} ${(star % 5) + 1}`;
+  return { medal: Math.min(5, Math.floor(star / 5)), star: (star % 5) + 1 };
+}
+
+/** Medal as text; `names` are the eight medal names (Russian by default). */
+export function dotaMedal(mmr, names = MEDALS_RU) {
+  const p = dotaMedalParts(mmr);
+  return p.star == null ? names[p.medal] : `${names[p.medal]} ${p.star}`;
 }
 
 const FACEIT_LEVELS = [500, 750, 900, 1050, 1200, 1350, 1530, 1750, 2000];

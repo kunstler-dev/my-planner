@@ -1,6 +1,7 @@
 // Notes: quick notes and ideas with search and pinning.
 import { state, update } from '../state.js';
 import { h, icon, uid, card, empty } from '../ui.js';
+import { t } from '../i18n.js';
 import { formModal } from '../modal.js';
 import { today, prettyDate } from '../dates.js';
 
@@ -9,11 +10,11 @@ let query = '';
 function noteModal(n) {
   const isNew = !n;
   formModal(
-    isNew ? 'Новая заметка' : 'Заметка',
+    isNew ? t('notes.new') : t('notes.note'),
     [
-      { key: 'title', label: 'Заголовок', placeholder: 'Необязательно' },
-      { key: 'text', label: 'Текст', type: 'textarea', rows: 10, required: true },
-      { key: 'pinned', label: 'Закрепить сверху', type: 'checkbox' },
+      { key: 'title', label: t('notes.title'), placeholder: t('common.optional') },
+      { key: 'text', label: t('notes.text'), type: 'textarea', rows: 10, required: true },
+      { key: 'pinned', label: t('notes.pin'), type: 'checkbox' },
     ],
     { title: '', text: '', pinned: false, ...n },
     {
@@ -35,7 +36,7 @@ export function notesView() {
   const search = h('input', {
     class: 'input',
     id: 'notes-search',
-    placeholder: 'Поиск по заметкам',
+    placeholder: t('notes.search'),
     value: query,
     style: { width: '240px' },
     oninput: (e) => {
@@ -53,8 +54,8 @@ export function notesView() {
     h(
       'div',
       { class: 'page-head' },
-      h('div', {}, h('h1', {}, 'Заметки'), h('div', { class: 'sub' }, `${state.data.notes.length} заметок`)),
-      h('div', { class: 'row' }, search, h('button', { class: 'btn primary', onclick: () => noteModal(null) }, icon('plus', 16), 'Заметка')),
+      h('div', {}, h('h1', {}, t('nav.notes')), h('div', { class: 'sub' }, t('notes.count', { n: state.data.notes.length }))),
+      h('div', { class: 'row' }, search, h('button', { class: 'btn primary', onclick: () => noteModal(null) }, icon('plus', 16), t('notes.note'))),
     ),
     notes.length
       ? h(
@@ -70,6 +71,6 @@ export function notesView() {
             ),
           ),
         )
-      : card(null, null, empty(query ? 'Ничего не найдено' : 'Идеи постов, мысли о проектах, вопросы к собеседованию — всё сюда.')),
+      : card(null, null, empty(query ? t('common.nothingFound') : t('notes.empty'))),
   );
 }

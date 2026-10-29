@@ -1,6 +1,7 @@
-// Electron main process: window, data store, Grok (API streaming and the grok.com webview), Telegram page
-// fetch, Steam prices, the user's background/banner media, file export.
-const { app, BrowserWindow, ipcMain, dialog, nativeTheme, shell, session, protocol, net } = require('electron');
+// Electron main process: window, tray, data store with daily backups, named secrets, Windows notifications, Grok
+// (API streaming and the grok.com webview), Telegram page fetch, Steam prices, the user's background/banner media,
+// file export.
+const { app, BrowserWindow, ipcMain, dialog, nativeTheme, shell, session, protocol, net, Tray, Menu, Notification } = require('electron');
 const { pathToFileURL } = require('url');
 const fs = require('fs');
 const path = require('path');
@@ -27,9 +28,18 @@ const STEAM = 'https://store.steampowered.com/api';
 const STEAM_CC = 'ua';
 
 let win;
+let tray = null;
 let store;
 let secrets;
+let quitting = false;
 const chats = new Map();
+// Interface strings for the tray menu and system dialogs; sent by the renderer in the chosen language.
+let strings = {};
+const str = (key, fallback = '') => (typeof strings[key] === 'string' && strings[key]) || fallback;
+// Started by Windows at login: stay in the tray.
+const startHidden = process.argv.includes('--hidden');
+// Notifications are kept referenced until closed, otherwise their click handler may be collected.
+const shown = new Set();
 
 // grok.com with the user's own subscription: a sandboxed <webview> with its own persistent session.
 const GROK_PARTITION = 'persist:grok';
@@ -103,15 +113,24 @@ function createWindow() {
     backgroundColor: data.settings.theme === 'dark' ? '#0e0e0e' : '#fafafa',
     autoHideMenuBar: true,
     icon: path.join(__dirname, '../renderer/assets/icon.png'),
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
       webviewTag: true,
+      // Timers of a window hidden in the tray must keep running (background checks, notifications).
+      backgroundThrottling: false,
     },
   });
   win.loadFile(path.join(__dirname, '../renderer/index.html'));
+  win.once('ready-to-show', () => !startHidden && win.show());
+  win.on('close', (e) => {
+    if (quitting || !store.load().settings.closeToTray) return;
+    e.preventDefault();
+    win.hide();
+  });
   if (process.argv.includes('--dev')) win.webContents.openDevTools({ mode: 'detach' });
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
@@ -120,11 +139,58 @@ function createWindow() {
   win.webContents.on('will-navigate', (e) => e.preventDefault());
 }
 
-app.on('second-instance', () => {
-  if (win) {
-    if (win.isMinimized()) win.restore();
-    win.focus();
+function showWindow() {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+/** Asks the renderer to open a section or run a command (tray menu, notification click). */
+function command(cmd) {
+  showWindow();
+  win?.webContents.send('app:command', cmd);
+}
+
+function buildTray() {
+  const menu = Menu.buildFromTemplate([
+    { label: str('main.tray.open', 'Planner'), click: showWindow },
+    { type: 'separator' },
+    { label: str('main.tray.expense', '+'), click: () => command({ cmd: 'expense' }) },
+    { label: str('main.tray.income', '+'), click: () => command({ cmd: 'income' }) },
+    { type: 'separator' },
+    {
+      label: str('main.tray.quit', 'Quit'),
+      click: () => {
+        quitting = true;
+        app.quit();
+      },
+    },
+  ]);
+  if (!tray) {
+    tray = new Tray(path.join(__dirname, '../renderer/assets/icon.png'));
+    tray.on('click', showWindow);
   }
+  tray.setToolTip('Planner');
+  tray.setContextMenu(menu);
+}
+
+// Start with Windows: the portable build runs from a temporary unpack folder, so the login item has to point at
+// the portable .exe itself (PORTABLE_EXECUTABLE_FILE), not at process.execPath.
+let autoStartApplied = null;
+function applyAutoStart(on) {
+  if (!app.isPackaged || autoStartApplied === on) return;
+  autoStartApplied = on;
+  const exe = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+  app.setLoginItemSettings({ openAtLogin: !!on, path: exe, args: ['--hidden'] });
+}
+
+const NOTIFY_VIEWS = ['home', 'finance', 'accounts', 'career', 'projects', 'channel', 'tasks', 'notes', 'games', 'grok', 'settings'];
+const clip = (v, max) => String(v ?? '').slice(0, max);
+
+app.on('second-instance', showWindow);
+app.on('before-quit', () => {
+  quitting = true;
 });
 
 app.whenReady().then(() => {
@@ -143,9 +209,9 @@ app.whenReady().then(() => {
     const exts = MEDIA_TYPES[kind];
     if (!exts) return null;
     const { canceled, filePaths } = await dialog.showOpenDialog(win, {
-      title: kind === 'banner' ? 'Баннер: видео, GIF или картинка' : 'Фон: картинка',
+      title: kind === 'banner' ? str('main.dialog.bannerTitle') : str('main.dialog.backgroundTitle'),
       properties: ['openFile'],
-      filters: [{ name: kind === 'banner' ? 'Видео и картинки' : 'Картинки', extensions: exts }],
+      filters: [{ name: kind === 'banner' ? str('main.dialog.videoAndImages', 'Media') : str('main.dialog.images', 'Images'), extensions: exts }],
     });
     if (canceled || !filePaths[0]) return null;
     const ext = path.extname(filePaths[0]).slice(1).toLowerCase();
@@ -207,10 +273,49 @@ app.whenReady().then(() => {
   ipcMain.handle('data:load', () => store.load());
   ipcMain.handle('data:save', (_e, data) => {
     store.save(data);
+    applyAutoStart(!!data?.settings?.autoStart);
     return true;
   });
-  ipcMain.handle('app:info', () => ({ version: app.getVersion(), dataDir: dir }));
+  ipcMain.handle('app:info', () => ({ version: app.getVersion(), dataDir: dir, packaged: app.isPackaged }));
   ipcMain.handle('app:openDataDir', () => shell.openPath(dir));
+  // Translated strings for the main process (tray, dialogs); the tray appears once they arrive.
+  ipcMain.handle('app:strings', (_e, dict) => {
+    if (!dict || typeof dict !== 'object') return false;
+    strings = Object.fromEntries(
+      Object.entries(dict)
+        .filter(([k, v]) => k.startsWith('main.') && typeof v === 'string')
+        .map(([k, v]) => [k, v.slice(0, 200)]),
+    );
+    buildTray();
+    return true;
+  });
+
+  // Daily backups: list, restore (current data is kept as data-before-restore-<time>.json first), open the folder.
+  ipcMain.handle('backups:list', () => store.backups.list());
+  ipcMain.handle('backups:restore', (_e, name) => {
+    const raw = store.backups.read(name);
+    if (!raw) return { ok: false };
+    store.save(raw);
+    return { ok: true, data: store.load() };
+  });
+  ipcMain.handle('backups:open', () => {
+    fs.mkdirSync(store.backups.folder, { recursive: true });
+    return shell.openPath(store.backups.folder);
+  });
+
+  // Windows notification; a click opens the window on the given section.
+  ipcMain.handle('app:notify', (_e, msg) => {
+    // PLANNER_SILENT: dev runs on demo data (screenshots) must not show real notifications.
+    if (process.env.PLANNER_SILENT || !Notification.isSupported() || !msg || typeof msg !== 'object') return false;
+    const view = NOTIFY_VIEWS.includes(msg.view) ? msg.view : 'home';
+    const n = new Notification({ title: clip(msg.title, 120) || 'Planner', body: clip(msg.body, 300), icon: path.join(__dirname, '../renderer/assets/icon.png') });
+    shown.add(n);
+    n.on('click', () => command({ cmd: 'go', view }));
+    n.on('close', () => shown.delete(n));
+    n.show();
+    setTimeout(() => shown.delete(n), 10 * 60 * 1000);
+    return true;
+  });
   ipcMain.handle('theme:set', (_e, theme) => {
     nativeTheme.themeSource = theme === 'dark' ? 'dark' : 'light';
   });
@@ -252,14 +357,18 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle('grok:hasKey', () => secrets.has());
-  ipcMain.handle('grok:setKey', (_e, key) => {
-    secrets.set(key);
-    return secrets.has();
+  // The renderer may only ask whether a secret exists and replace it; values never leave the main process.
+  // The PIN will get its own handler (stored as a hash), so it is not settable here.
+  const RENDERER_SECRETS = ['xai', 'mono', 'imap'];
+  ipcMain.handle('secret:has', (_e, name) => (RENDERER_SECRETS.includes(name) || name === 'pin' ? secrets.has(name) : false));
+  ipcMain.handle('secret:set', (_e, name, value) => {
+    if (!RENDERER_SECRETS.includes(name) || (value != null && typeof value !== 'string') || String(value ?? '').length > 4096) return false;
+    secrets.set(name, value);
+    return secrets.has(name);
   });
   ipcMain.handle('grok:models', async () => {
     try {
-      return { ok: true, models: await listModels(secrets.get()) };
+      return { ok: true, models: await listModels(secrets.get('xai')) };
     } catch (err) {
       return { ok: false, code: err.code || 'http', message: err.message };
     }
@@ -269,7 +378,7 @@ app.whenReady().then(() => {
     chats.set(id, ctrl);
     try {
       const text = await streamChat({
-        key: secrets.get(),
+        key: secrets.get('xai'),
         model,
         messages,
         signal: ctrl.signal,

@@ -3,6 +3,7 @@
 import { h } from './ui.js';
 import { state } from './state.js';
 import { createPetCorner } from './pets3d.js';
+import { t } from './i18n.js';
 
 let el = null;
 let scene = null;
@@ -53,10 +54,11 @@ function buildScene() {
 /** The pet corner element for the sidebar (created once, re-used on every render). */
 export function petCorner() {
   if (!el) {
-    el = h('div', { class: 'pet-corner', 'aria-hidden': 'true', title: 'Сефирка, Гудсик и Бублик' });
+    el = h('div', { class: 'pet-corner', 'aria-hidden': 'true', title: t('pets.title') });
     setTimeout(buildScene, 300);
   }
   const s = state.data.settings;
+  el.title = t('pets.title');
   el.hidden = s.pets === false;
   el.classList.toggle('mono', !s.petsColor);
   if (el.hidden) stop();

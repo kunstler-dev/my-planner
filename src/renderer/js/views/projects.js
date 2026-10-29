@@ -2,30 +2,28 @@
 // Grok helper for monetization ideas.
 import { state, update } from '../state.js';
 import { h, icon, money, uid, card, empty } from '../ui.js';
+import { t, num } from '../i18n.js';
 import { formModal } from '../modal.js';
 import { today, prettyDate } from '../dates.js';
 import { projectStats } from '../planner-calc.js';
+import { CAT } from '../finance-calc.js';
 import { entryModal } from './finance.js';
 import { go } from '../app.js';
 
-const STATUSES = [
-  ['idea', 'Идея'],
-  ['active', 'В работе'],
-  ['launched', 'Запущен'],
-  ['paused', 'Пауза'],
-];
-const statusLabel = (k) => STATUSES.find(([v]) => v === k)?.[1] || k;
+const STATUSES = ['idea', 'active', 'launched', 'paused'];
+const statuses = () => STATUSES.map((k) => [k, t(`project.status.${k}`)]);
+const statusLabel = (k) => (STATUSES.includes(k) ? t(`project.status.${k}`) : k);
 
 function projectModal(p) {
   const isNew = !p;
   formModal(
-    isNew ? 'Новый проект' : p.name,
+    isNew ? t('project.new') : p.name,
     [
-      { key: 'name', label: 'Название', required: true, placeholder: 'Например, Planner, ELT-бот, Kitten Planner' },
-      { key: 'status', label: 'Статус', type: 'select', options: STATUSES, half: true },
-      { key: 'link', label: 'Ссылка (GitHub, сайт, бот)', half: true },
-      { key: 'description', label: 'Что это и для кого', type: 'textarea', rows: 3 },
-      { key: 'money', label: 'Как зарабатывает или может зарабатывать', type: 'textarea', rows: 3, placeholder: 'Подписка, донаты, заказы, реклама, продажа шаблонов…' },
+      { key: 'name', label: t('common.name'), required: true, placeholder: t('project.namePh') },
+      { key: 'status', label: t('common.status'), type: 'select', options: statuses(), half: true },
+      { key: 'link', label: t('project.link'), half: true },
+      { key: 'description', label: t('project.description'), type: 'textarea', rows: 3 },
+      { key: 'money', label: t('project.money'), type: 'textarea', rows: 3, placeholder: t('project.moneyPh') },
     ],
     { name: '', status: 'active', link: '', description: '', money: '', ...p },
     {
@@ -47,11 +45,11 @@ function projectModal(p) {
 
 function hoursModal(p) {
   formModal(
-    `Время: ${p.name}`,
+    t('project.timeOf', { name: p.name }),
     [
-      { key: 'hours', label: 'Сколько часов', type: 'number', required: true, half: true },
-      { key: 'date', label: 'Дата', type: 'date', half: true },
-      { key: 'note', label: 'Что сделал' },
+      { key: 'hours', label: t('project.hoursHowMany'), type: 'number', required: true, half: true },
+      { key: 'date', label: t('common.date'), type: 'date', half: true },
+      { key: 'note', label: t('project.whatDone') },
     ],
     { hours: '', date: today(), note: '' },
     {
@@ -64,30 +62,33 @@ function hoursModal(p) {
 }
 
 function monetizePrompt(p, st) {
-  return (
-    `Мой проект: ${p.name} (${statusLabel(p.status)}). ${p.description || ''}\n` +
-    `Как сейчас зарабатывает: ${p.money || 'пока никак'}. Доход всего: ${money(st.income)}, расходы: ${money(st.expense)}, вложено часов: ${st.hours}.\n` +
-    'Я живу в Германии и параллельно ищу Ausbildung. Предложи 5 реалистичных способов заработать на этом проекте (что сделать, сколько примерно можно получать, ' +
-    'что учесть по налогам/Gewerbe в Германии), и план первых шагов на 2 недели.'
-  );
+  return t('prompt.monetize', {
+    name: p.name,
+    status: statusLabel(p.status),
+    description: p.description || '',
+    money: p.money || t('prompt.nothingYet'),
+    income: money(st.income),
+    expense: money(st.expense),
+    hours: st.hours,
+  });
 }
 
 function projectCard(p) {
   const st = projectStats(p, state.data.finance);
-  const quick = h('input', { class: 'input', placeholder: 'Новый этап…', style: { flex: 1, height: '32px' } });
+  const quick = h('input', { class: 'input', placeholder: t('project.milestonePh'), style: { flex: 1, height: '32px' } });
   return card(
     p.name,
-    h('div', { class: 'row' }, h('span', { class: `badge${p.status === 'launched' ? ' solid' : ''}` }, statusLabel(p.status)), h('button', { class: 'btn ghost sm icon-only', title: 'Изменить', onclick: () => projectModal(p) }, icon('edit', 15))),
+    h('div', { class: 'row' }, h('span', { class: `badge${p.status === 'launched' ? ' solid' : ''}` }, statusLabel(p.status)), h('button', { class: 'btn ghost sm icon-only', title: t('common.edit'), onclick: () => projectModal(p) }, icon('edit', 15))),
     p.description && h('p', { class: 'muted', style: { margin: '0 0 12px' } }, p.description),
     h(
       'div',
       { class: 'grid cols-3', style: { gap: '10px', marginBottom: '12px' } },
-      h('div', { class: 'mini-stat' }, h('div', { class: 'meta' }, 'Прибыль'), h('div', { class: 'mini-value' }, money(st.profit, { sign: true }))),
-      h('div', { class: 'mini-stat' }, h('div', { class: 'meta' }, 'Часов'), h('div', { class: 'mini-value' }, st.hours.toLocaleString('ru-RU'))),
-      h('div', { class: 'mini-stat' }, h('div', { class: 'meta' }, 'За час'), h('div', { class: 'mini-value' }, st.perHour != null ? money(st.perHour) : '—')),
+      h('div', { class: 'mini-stat' }, h('div', { class: 'meta' }, t('project.profit')), h('div', { class: 'mini-value' }, money(st.profit, { sign: true }))),
+      h('div', { class: 'mini-stat' }, h('div', { class: 'meta' }, t('project.hours')), h('div', { class: 'mini-value' }, num(st.hours))),
+      h('div', { class: 'mini-stat' }, h('div', { class: 'meta' }, t('project.perHour')), h('div', { class: 'mini-value' }, st.perHour != null ? money(st.perHour) : '—')),
     ),
     p.money && h('div', { class: 'meta', style: { marginBottom: '10px' } }, `💰 ${p.money}`),
-    h('div', { class: 'day-head' }, h('span', {}, 'Этапы'), h('span', {}, `${st.milestonesDone} из ${st.milestones}`)),
+    h('div', { class: 'day-head' }, h('span', {}, t('project.milestones')), h('span', {}, t('common.nOfM', { n: st.milestonesDone, m: st.milestones }))),
     h(
       'div',
       { class: 'list' },
@@ -112,7 +113,7 @@ function projectCard(p) {
           h(
             'div',
             { class: 'hover-actions' },
-            h('button', { class: 'btn ghost sm icon-only', title: 'Удалить', onclick: () => update((d) => (d.projects.find((y) => y.id === p.id).milestones = d.projects.find((y) => y.id === p.id).milestones.filter((y) => y.id !== m.id))) }, icon('trash', 14)),
+            h('button', { class: 'btn ghost sm icon-only', title: t('common.delete'), onclick: () => update((d) => (d.projects.find((y) => y.id === p.id).milestones = d.projects.find((y) => y.id === p.id).milestones.filter((y) => y.id !== m.id))) }, icon('trash', 14)),
           ),
         ),
       ),
@@ -129,23 +130,23 @@ function projectCard(p) {
         },
       },
       quick,
-      h('button', { class: 'btn sm icon-only', type: 'submit', title: 'Добавить этап' }, icon('plus', 14)),
+      h('button', { class: 'btn sm icon-only', type: 'submit', title: t('project.addMilestone') }, icon('plus', 14)),
     ),
     h(
       'div',
       { class: 'row', style: { flexWrap: 'wrap' } },
-      h('button', { class: 'btn sm', onclick: () => hoursModal(p) }, icon('plus', 14), 'Часы'),
-      h('button', { class: 'btn sm', onclick: () => entryModal({ type: 'income', projectId: p.id, category: 'Продажи', note: p.name }) }, icon('plus', 14), 'Доход'),
-      h('button', { class: 'btn sm', onclick: () => entryModal({ type: 'expense', projectId: p.id, category: 'Связь и подписки', note: p.name }) }, icon('plus', 14), 'Расход'),
+      h('button', { class: 'btn sm', onclick: () => hoursModal(p) }, icon('plus', 14), t('project.hours')),
+      h('button', { class: 'btn sm', onclick: () => entryModal({ type: 'income', projectId: p.id, category: CAT.sales, note: p.name }) }, icon('plus', 14), t('finance.income')),
+      h('button', { class: 'btn sm', onclick: () => entryModal({ type: 'expense', projectId: p.id, category: CAT.subscriptions, note: p.name }) }, icon('plus', 14), t('finance.expense')),
       h('div', { class: 'spacer' }),
-      p.link && h('a', { class: 'btn ghost sm', href: p.link, target: '_blank' }, 'Открыть'),
-      h('button', { class: 'btn ghost sm', onclick: () => go('grok', { prompt: monetizePrompt(p, st) }) }, icon('spark', 14), 'Как заработать'),
+      p.link && h('a', { class: 'btn ghost sm', href: p.link, target: '_blank' }, t('common.open')),
+      h('button', { class: 'btn ghost sm', onclick: () => go('grok', { prompt: monetizePrompt(p, st) }) }, icon('spark', 14), t('project.howToEarn')),
     ),
     (p.hours || []).length > 0 &&
       h(
         'div',
         { class: 'meta', style: { marginTop: '10px' } },
-        `Последнее: ${prettyDate(p.hours.at(-1).date)} — ${p.hours.at(-1).hours} ч${p.hours.at(-1).note ? `, ${p.hours.at(-1).note}` : ''}`,
+        t('project.lastHours', { date: prettyDate(p.hours.at(-1).date), hours: num(p.hours.at(-1).hours), note: p.hours.at(-1).note ? `, ${p.hours.at(-1).note}` : '' }),
       ),
   );
 }
@@ -162,22 +163,16 @@ export function projectsView() {
     h(
       'div',
       { class: 'page-head' },
-      h('div', {}, h('h1', {}, 'Проекты'), h('div', { class: 'sub' }, 'Приложения и проекты, на которых хочешь зарабатывать')),
-      h('button', { class: 'btn primary', onclick: () => projectModal(null) }, icon('plus', 16), 'Проект'),
+      h('div', {}, h('h1', {}, t('nav.projects')), h('div', { class: 'sub' }, t('project.sub'))),
+      h('button', { class: 'btn primary', onclick: () => projectModal(null) }, icon('plus', 16), t('project.add')),
     ),
     h(
       'div',
       { class: 'grid cols-3', style: { marginBottom: '16px' } },
-      h('div', { class: 'card stat dark' }, h('div', { class: 'stat-label' }, 'Заработано на проектах'), h('div', { class: 'stat-value' }, money(income)), h('div', { class: 'stat-note' }, `прибыль ${money(profit, { sign: true })}`)),
-      h('div', { class: 'card stat' }, h('div', { class: 'stat-label' }, 'Вложено времени'), h('div', { class: 'stat-value' }, `${hours.toLocaleString('ru-RU')} ч`), h('div', { class: 'stat-note' }, `${projects.length} проектов`)),
-      h('div', { class: 'card stat' }, h('div', { class: 'stat-label' }, 'В среднем за час'), h('div', { class: 'stat-value' }, hours ? money(profit / hours) : '—'), h('div', { class: 'stat-note' }, 'прибыль / часы')),
+      h('div', { class: 'card stat dark' }, h('div', { class: 'stat-label' }, t('project.earned')), h('div', { class: 'stat-value' }, money(income)), h('div', { class: 'stat-note' }, t('project.profitNote', { amount: money(profit, { sign: true }) }))),
+      h('div', { class: 'card stat' }, h('div', { class: 'stat-label' }, t('project.timeSpent')), h('div', { class: 'stat-value' }, t('project.hoursValue', { v: num(hours) })), h('div', { class: 'stat-note' }, t('project.count', { n: projects.length }))),
+      h('div', { class: 'card stat' }, h('div', { class: 'stat-label' }, t('project.avgHour')), h('div', { class: 'stat-value' }, hours ? money(profit / hours) : '—'), h('div', { class: 'stat-note' }, t('project.profitPerHour'))),
     ),
-    projects.length
-      ? h('div', { class: 'grid cols-2', style: { alignItems: 'start' } }, projects.map(projectCard))
-      : card(
-          null,
-          null,
-          empty('Добавь свои проекты — например Planner, ELT-бот, Kitten Planner. Доходы и расходы привязываются к проекту прямо в записи финансов, часы — кнопкой «Часы».'),
-        ),
+    projects.length ? h('div', { class: 'grid cols-2', style: { alignItems: 'start' } }, projects.map(projectCard)) : card(null, null, empty(t('project.empty'))),
   );
 }
