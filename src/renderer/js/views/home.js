@@ -209,12 +209,22 @@ registerHomeCard({
   render: () => {
     const soon = upcoming(state.data.recurring, today(), 7);
     const overBudget = budgetStatus(inMonth(state.data.finance, thisMonth()), state.data.budgets).filter((b) => b.share >= 0.9);
+    // Bills from letters: unpaid ones due within a week (or overdue); a click marks one paid.
+    const bills = state.data.bills.filter((b) => !b.paid && b.dueDate <= addDays(today(), 7));
+    const rows = [
+      ...soon.map((r) => ({ date: r.next, title: r.title, note: catLabel(r.category), amount: r.type === 'income' ? r.amount : -r.amount, onclick: () => go('finance') })),
+      ...bills.map((b) => ({
+        date: b.dueDate,
+        title: b.title,
+        note: b.dueDate < today() ? t('home.billOverdue') : t('home.bill'),
+        amount: -b.amount,
+        onclick: () => confirm(t('home.billPaidConfirm', { title: b.title })) && update((d) => Object.assign(d.bills.find((x) => x.id === b.id), { paid: true, paidAt: today() })),
+      })),
+    ].sort((a, b) => a.date.localeCompare(b.date));
     return card(
       t('home.upcoming'),
       null,
-      soon.length
-        ? opList(soon.map((r) => ({ date: r.next, title: r.title, note: catLabel(r.category), amount: r.type === 'income' ? r.amount : -r.amount, onclick: () => go('finance') })))
-        : empty(t('home.noUpcoming')),
+      rows.length ? opList(rows) : empty(t('home.noUpcoming')),
       overBudget.length > 0 && h('div', { class: 'meta', style: { marginTop: '6px' } }, t('home.budgetWarn', { list: overBudget.map((b) => catLabel(b.category)).join(', ') })),
     );
   },
@@ -290,6 +300,19 @@ function editable(c, node, hidden) {
   );
 }
 
+/** «Payment failed» and similar letters: a banner on top until dismissed in the inbox. */
+function alertsBanner() {
+  const alerts = state.data.inbox.filter((x) => x.kind === 'alert' && x.status === 'new');
+  if (!alerts.length) return null;
+  return h(
+    'div',
+    { class: 'alert-banner' },
+    icon('alert', 18),
+    h('div', { class: 'grow' }, alerts.map((a) => h('div', {}, h('b', {}, a.domain || a.sender), ` — ${a.title}`))),
+    h('button', { class: 'btn sm', onclick: () => go('inbox') }, t('common.open')),
+  );
+}
+
 export function homeView() {
   const { order: saved, hidden } = state.data.settings.homeLayout;
   const order = layoutOrder(saved, knownIds());
@@ -317,6 +340,7 @@ export function homeView() {
         h('button', { class: 'btn primary', onclick: () => entryModal({ type: 'expense' }) }, icon('plus', 16), t('finance.expense')),
       ),
     ),
+    alertsBanner(),
     editing &&
       h(
         'div',

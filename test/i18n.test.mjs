@@ -61,10 +61,11 @@ test('every key used in the code is in the dictionary', () => {
 });
 
 test('no Cyrillic in screens and the main process outside the dictionaries', () => {
-  // Explicit exceptions: none yet (keywords for parsing e-mails will be listed here).
+  // Explicit exceptions: Gmail search words (search terms, not interface text).
+  const allowedFiles = [path.join('src', 'main', 'mail-keywords.js')];
   const allowed = [];
   const offenders = [];
-  for (const f of [...files('src/renderer/js/views'), ...files('src/main')]) {
+  for (const f of [...files('src/renderer/js/views'), ...files('src/main')].filter((x) => !allowedFiles.includes(x))) {
     fs.readFileSync(path.join(root, f), 'utf8')
       .split('\n')
       .forEach((line, i) => {

@@ -10,11 +10,18 @@ import { CURRENCY } from '../mono-import.js';
 import { accountName } from '../labels.js';
 import { checkMono, syncMono, isSyncing, monoErrorText } from '../account-sync.js';
 import { monoLabel } from './accounts.js';
+import { checkMail, isMailChecking, mailRules, mailErrorText, scheduleMail } from '../mail-sync.js';
+import { DEFAULT_MAIL_RULES } from '../mail-parse.js';
+import { catLabel } from '../labels.js';
+import { categories } from './finance.js';
+import { formModal } from '../modal.js';
 
 let models = null;
 let keySet = null;
 let backups = null;
 let monoSet = null;
+let imapSet = null;
+let rulesOpen = false;
 let backupsAt = 0;
 
 function seg(options, value, onPick) {
@@ -204,6 +211,148 @@ function monoCardBody() {
   );
 }
 
+const setMail = (patch) => {
+  update((d) => (d.settings.mail = { ...d.settings.mail, ...patch }));
+  scheduleMail();
+};
+
+/** Saves the sender rules (the first edit copies the built-in ones into data). */
+const saveRules = (fn) => update((d) => (d.mailRules = fn(d.mailRules.length ? d.mailRules : DEFAULT_MAIL_RULES.map((r) => ({ ...r })))));
+
+function mailRuleModal(rule) {
+  const isNew = !rule;
+  formModal(
+    isNew ? t('mail.rules.new') : rule.domain,
+    [
+      { key: 'domain', label: t('mail.rules.domain'), required: true, placeholder: 'example.com' },
+      {
+        key: 'action',
+        label: t('mail.rules.action'),
+        type: 'select',
+        options: ['expense', 'alert', 'skip'].map((k) => [k, t(`mail.rules.act.${k}`)]),
+        half: true,
+      },
+      { key: 'category', label: t('common.category'), type: 'select', options: [['', '—'], ...categories('expense').map((c) => [c, catLabel(c)])], half: true },
+      { key: 'skip', label: t('mail.rules.skipWords'), placeholder: 'SEPA, Mandat' },
+      { key: 'only', label: t('mail.rules.onlyWords'), placeholder: 'payment failed' },
+    ],
+    { domain: '', action: 'expense', category: '', ...rule, skip: (rule?.skip || []).join(', '), only: (rule?.only || []).join(', ') },
+    {
+      onSave: (v) => {
+        const domain = v.domain.toLowerCase().replace(/^.*@/, '').trim();
+        if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(domain)) return toast(t('mail.rules.badDomain')), false;
+        const words = (x) => x.split(',').map((w) => w.trim()).filter(Boolean);
+        const rec = { ...(rule || { id: uid() }), domain, action: v.action, category: v.category || null, skip: words(v.skip), only: words(v.only) };
+        if (!rec.only.length) delete rec.only;
+        saveRules((list) => (isNew ? [...list, rec] : list.map((r) => (r.id === rule.id ? rec : r))));
+      },
+      onDelete: isNew ? null : () => saveRules((list) => list.filter((r) => r.id !== rule.id)),
+    },
+  );
+}
+
+function mailCard() {
+  if (imapSet === null) {
+    imapSet = false;
+    window.api.secrets.has('imap').then((v) => {
+      imapSet = v;
+      if (state.view === 'settings') update(() => {});
+    });
+  }
+  const m = state.data.settings.mail;
+  const sync = state.data.sync.mail || {};
+  const address = h('input', { class: 'input', type: 'email', value: m.address, placeholder: 'name@gmail.com', style: { width: '260px' }, onchange: (e) => setMail({ address: e.target.value.trim() }) });
+  const pass = h('input', { class: 'input', type: 'password', placeholder: imapSet ? t('mail.passReplacePh') : t('mail.passPh'), style: { width: '220px' } });
+  const rules = mailRules();
+  const c = card(
+    t('mail.title'),
+    null,
+    h(
+      'div',
+      { class: 'list' },
+      settingRow(t('mail.enabled'), t('mail.enabledHint'), onOff(m.enabled, (v) => setMail({ enabled: v }))),
+      settingRow(t('mail.address'), null, address),
+      settingRow(
+        t('mail.password'),
+        h('span', {}, imapSet ? t('settings.keyStored') : t('settings.keyNone'), t('mail.passHow'), h('a', { href: 'https://myaccount.google.com/apppasswords', target: '_blank', style: { color: 'inherit' } }, 'myaccount.google.com/apppasswords'), '.'),
+        h(
+          'div',
+          { class: 'row' },
+          pass,
+          h(
+            'button',
+            {
+              class: 'btn primary',
+              onclick: async () => {
+                if (!pass.value.trim()) return;
+                imapSet = await window.api.secrets.set('imap', pass.value.trim());
+                toast(t('mail.passSaved'));
+                update(() => {});
+              },
+            },
+            t('common.save'),
+          ),
+          imapSet &&
+            h(
+              'button',
+              {
+                class: 'btn ghost',
+                onclick: async () => {
+                  imapSet = await window.api.secrets.set('imap', '');
+                  update(() => {});
+                },
+              },
+              t('common.delete'),
+            ),
+        ),
+      ),
+      settingRow(
+        t('mail.interval'),
+        null,
+        seg(
+          [5, 15, 30, 60].map((n) => [n, t('mail.minutes', { n })]),
+          m.interval,
+          (v) => setMail({ interval: v }),
+        ),
+      ),
+      settingRow(
+        t('mail.status'),
+        sync.error ? `⚠ ${mailErrorText(sync.error)}` : sync.lastCheck ? t('mail.lastCheck', { time: dateTime(sync.lastCheck) }) : t('mail.never'),
+        h('button', { class: 'btn', disabled: !imapSet || !m.address || isMailChecking(), onclick: () => checkMail({ silent: false }) }, isMailChecking() ? t('sync.running') : t('mail.checkNow')),
+      ),
+      settingRow(
+        t('mail.grok'),
+        state.data.settings.grokMode === 'api' ? t('mail.grokHint') : t('mail.grokNeedsApi'),
+        onOff(m.grok && state.data.settings.grokMode === 'api', (v) => state.data.settings.grokMode === 'api' && setMail({ grok: v })),
+      ),
+      settingRow(
+        t('mail.rules.title'),
+        t('mail.rules.hint', { n: rules.length }),
+        h('div', { class: 'row' }, h('button', { class: 'btn ghost sm', onclick: () => ((rulesOpen = !rulesOpen), update(() => {})) }, rulesOpen ? t('common.collapse') : t('mail.rules.show'))),
+      ),
+      rulesOpen && [
+        ...rules.map((r) =>
+          h(
+            'div',
+            { class: 'list-row compact', style: { cursor: 'pointer' }, onclick: () => mailRuleModal(r) },
+            h('div', { class: 'grow' }, h('div', { class: 'title' }, r.domain), h('div', { class: 'meta' }, [t(`mail.rules.act.${r.action}`), r.category && catLabel(r.category), r.skip?.length && t('mail.rules.skipShort', { list: r.skip.join(', ') }), r.only?.length && t('mail.rules.onlyShort', { list: r.only.join(', ') })].filter(Boolean).join(' · '))),
+            icon('edit', 14),
+          ),
+        ),
+        h(
+          'div',
+          { class: 'row', style: { padding: '8px 4px' } },
+          h('button', { class: 'btn sm', onclick: () => mailRuleModal(null) }, icon('plus', 14), t('mail.rules.add')),
+          state.data.mailRules.length > 0 && h('button', { class: 'btn ghost sm', onclick: () => confirm(t('mail.rules.resetConfirm')) && update((d) => (d.mailRules = [])) }, t('mail.rules.reset')),
+        ),
+      ],
+    ),
+    h('p', { class: 'meta', style: { margin: '8px 4px 0' } }, t('mail.privacy')),
+  );
+  c.dataset.section = 'mail';
+  return c;
+}
+
 function notificationsCard() {
   const n = state.data.settings.notify;
   const type = (key) => settingRow(t(`settings.notify.${key}`), t(`settings.notify.${key}Hint`), onOff(n[key], (v) => setNotify(key, v)));
@@ -217,6 +366,8 @@ function notificationsCard() {
       type('budget'),
       type('followUp'),
       type('habits'),
+      type('bills'),
+      type('alerts'),
       n.habits && settingRow(t('settings.notify.habitsAt'), null, timeInput(n.habitsAt, (v) => setNotify('habitsAt', v))),
       settingRow(
         t('settings.quietHours'),
@@ -512,6 +663,7 @@ export function settingsView() {
         ),
       ),
       monoCard(),
+      mailCard(),
       notificationsCard(),
       card(t('settings.data'), null, h('div', { class: 'list' }, settingRow(t('settings.whereStored'), t('settings.whereStoredHint'), h('button', { class: 'btn', onclick: () => window.api.openDataDir() }, t('settings.openFolder'))))),
       backupsCard(),

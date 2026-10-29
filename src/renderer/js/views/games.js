@@ -188,6 +188,7 @@ function wishRow(i) {
           .join(' · '),
       ),
     ),
+    i.boughtAt && h('span', { class: 'badge', title: prettyDate(i.boughtAt) }, t('games.bought')),
     i.discount > 0 && h('span', { class: 'badge solid' }, `−${i.discount}%`),
     h(
       'div',
