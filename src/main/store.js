@@ -24,7 +24,7 @@ function defaultDocs() {
 
 // Notification types are switched on by default; quiet hours 23:00–08:00.
 function defaultNotify() {
-  return { recurring: true, budget: true, followUp: true, habits: true, bills: true, alerts: true, contracts: true, steam: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
+  return { recurring: true, budget: true, followUp: true, habits: true, bills: true, alerts: true, contracts: true, steam: true, jobs: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
 }
 
 function defaultData() {
@@ -87,7 +87,13 @@ function defaultData() {
     mailRules: [],
     // Bills from letters with a due date: { id, title, amount, dueDate, paid, ref, category }.
     bills: [],
+    // Saved job searches, «not interested» refnr and the last daily check.
+    jobs: defaultJobs(),
   };
+}
+
+function defaultJobs() {
+  return { searches: [], ignored: [], lastRun: '', found: null, error: '' };
 }
 
 function defaultMail() {
@@ -160,6 +166,7 @@ function normalize(raw) {
     inbox: arr(raw.inbox),
     mailRules: arr(raw.mailRules),
     bills: arr(raw.bills),
+    jobs: { ...defaultJobs(), ...obj(raw.jobs), searches: arr(raw.jobs?.searches), ignored: arr(raw.jobs?.ignored) },
     mono: { ...defaultMono(), ...obj(raw.mono), accounts: arr(raw.mono?.accounts), jars: arr(raw.mono?.jars), last: obj(raw.mono?.last) },
   };
 }

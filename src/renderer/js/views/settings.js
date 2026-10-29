@@ -394,6 +394,7 @@ function notificationsCard() {
       type('alerts'),
       type('contracts'),
       type('steam'),
+      type('jobs'),
       n.habits && settingRow(t('settings.notify.habitsAt'), null, timeInput(n.habitsAt, (v) => setNotify('habitsAt', v))),
       settingRow(
         t('settings.quietHours'),

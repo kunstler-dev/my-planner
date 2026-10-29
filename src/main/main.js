@@ -493,6 +493,38 @@ app.whenReady().then(() => {
       return { ok: false, error: err.code || 'http' };
     }
   });
+  // Job search at the Bundesagentur für Arbeit (jobsuche API v6, public client id). Only the fields the planner
+  // keeps are returned.
+  ipcMain.handle('jobs:search', async (_e, q) => {
+    const str = (v, n) => String(v ?? '').slice(0, n);
+    const params = new URLSearchParams({
+      was: str(q?.was, 100),
+      wo: str(q?.wo, 100),
+      umkreis: String(Math.min(200, Math.max(0, Number(q?.umkreis) || 25))),
+      angebotsart: String([1, 4, 34].includes(Number(q?.angebotsart)) ? Number(q.angebotsart) : 4),
+      veroeffentlichtseit: String(Math.min(100, Math.max(0, Number(q?.veroeffentlichtseit) || 7))),
+      page: '1',
+      size: String(Math.min(100, Math.max(1, Number(q?.size) || 50))),
+    });
+    try {
+      const res = await fetch(`https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs?${params}`, { headers: { 'X-API-Key': 'jobboerse-jobsuche' }, signal: AbortSignal.timeout(20000) });
+      if (!res.ok) return { ok: false, error: 'http', status: res.status };
+      const json = await res.json();
+      const jobs = (json.ergebnisliste || []).map((j) => ({
+        refnr: str(j.referenznummer, 60),
+        title: str(j.stellenangebotsTitel || j.hauptberuf, 200),
+        profession: str(j.hauptberuf, 120),
+        company: str(j.firma, 120),
+        city: str(j.stellenlokationen?.[0]?.adresse?.ort, 80),
+        published: str(j.datumErsteVeroeffentlichung || j.veroeffentlichungszeitraum?.von, 10),
+        start: str(j.eintrittszeitraum?.von, 10),
+      }));
+      return { ok: true, jobs };
+    } catch (err) {
+      return { ok: false, error: 'network', message: err.message };
+    }
+  });
+
   ipcMain.handle('mono:statement', (_e, account, from, to) => mono.statement(account, from, to));
 
   // The renderer may only ask whether a secret exists and replace it; values never leave the main process.

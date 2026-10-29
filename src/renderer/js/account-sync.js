@@ -10,6 +10,7 @@ import { MINUTE } from './notify-calc.js';
 import { CURRENCY, importStatement, statementWindows, nextFrom, jarContribution } from './mono-import.js';
 import { pruneInbox } from './inbox.js';
 import { scheduleMail } from './mail-sync.js';
+import { checkJobs } from './jobs-sync.js';
 import { refreshPrices } from './views/games.js';
 
 const running = new Set();
@@ -191,5 +192,6 @@ export async function startAccountSync() {
   // Wishlist prices once a day even when the Games screen isn't opened (target price notifications).
   register('steam-prices', 24 * 60 * MINUTE, () => refreshPrices({ silent: true }));
   scheduleMail();
+  register('jobs', 24 * 60 * MINUTE, () => checkJobs());
   register('inbox-prune', 24 * 60 * MINUTE, () => update((d) => (d.inbox = pruneInbox(d.inbox, today())), { silent: true }));
 }

@@ -103,6 +103,7 @@ function demoData() {
       last: {},
       error: '',
     },
+    jobs: { searches: [{ id: 'js1', was: 'Fachinformatiker', wo: 'Berlin', umkreis: 30, type: 'ausbildung' }], ignored: [], lastRun: day(0), found: null, error: '' },
     rules: [{ id: 'ru1', field: 'desc', value: 'silpo', category: 'Еда', kind: 'expense', createdAt: day(5) }],
     // Letters (made up): a phone bill due soon, a receipt matching a bank operation, an invitation, a failed payment.
     bills: [{ id: 'b1', title: 'Vodafone', amount: 39.99, dueDate: day(-3), paid: false, ref: 'mail:demo-voda@example.test', category: 'Связь и подписки' }],
@@ -141,6 +142,9 @@ function demoData() {
         { id: 'p3', company: 'REWE', position: 'Kaufmann im Einzelhandel', kind: 'ausbildung', city: 'Köln', status: 'wish' },
         { id: 'p4', company: 'Lidl', position: 'Werkstudent IT', kind: 'werkstudent', city: 'Berlin', status: 'sent', sentAt: day(1) },
         { id: 'p5', company: 'Zalando', position: 'Praktikum Frontend', kind: 'praktikum', city: 'Berlin', status: 'rejected', sentAt: day(25) },
+        // Found by the saved job search (made up).
+        { id: 'p6', company: 'Beispiel IT GmbH', position: 'Ausbildung Fachinformatiker/in - Anwendungsentwicklung', kind: 'ausbildung', city: 'Berlin', status: 'wish', refnr: 'demo-1', link: 'https://www.arbeitsagentur.de/jobsuche/', isNew: true, source: 'jobs', createdAt: day(0) },
+        { id: 'p7', company: 'Muster Systemhaus', position: 'Ausbildung Fachinformatiker/in - Systemintegration', kind: 'ausbildung', city: 'Potsdam', status: 'wish', refnr: 'demo-2', link: 'https://www.arbeitsagentur.de/jobsuche/', isNew: true, source: 'jobs', createdAt: day(0) },
       ],
     },
     projects: [

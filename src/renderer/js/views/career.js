@@ -8,6 +8,8 @@ import { today, prettyDate, addDays } from '../dates.js';
 import { APP_STATUSES, careerStats } from '../planner-calc.js';
 import { docTitle } from '../labels.js';
 import { go } from '../app.js';
+import { JOB_TYPES } from '../jobs-calc.js';
+import { checkJobs, isJobsChecking, ignoreJob } from '../jobs-sync.js';
 
 const KINDS = ['ausbildung', 'job', 'werkstudent', 'minijob', 'praktikum'];
 const kinds = () => KINDS.map((k) => [k, t(`career.kind.${k}`)]);
@@ -56,6 +58,8 @@ export function createFromLetter(item) {
 
 function appModal(a) {
   const isNew = !a?.id;
+  // Opening a new ad from the job search takes the «new» mark off.
+  if (a?.isNew) update((d) => (d.career.applications.find((x) => x.id === a.id).isNew = false), { silent: true });
   formModal(
     isNew ? t('career.newApp') : `${a.company} — ${a.position}`,
     [
@@ -258,9 +262,10 @@ function appRow(a) {
     h(
       'div',
       { class: 'grow', style: { cursor: 'pointer', minWidth: 0 }, onclick: () => appModal(a) },
-      h('div', { class: 'title' }, h('b', {}, a.company), ' — ', a.position),
+      h('div', { class: 'title' }, a.isNew && h('span', { class: 'badge solid', style: { marginRight: '6px' } }, t('jobs.new')), h('b', {}, a.company), ' — ', a.position),
       h('div', { class: 'meta' }, meta.join(' · ')),
     ),
+    a.refnr && a.status === 'wish' && h('button', { class: 'btn ghost sm', title: t('jobs.ignoreHint'), onclick: () => ignoreJob(a) }, t('jobs.ignore')),
     due && h('span', { class: 'due-pill', title: t('career.followUpOn', { date: prettyDate(a.followUp) }) }, t('career.writeAgain')),
     h('div', { class: 'app-actions' }, grok, a.link && h('a', { class: 'btn ghost sm icon-only', href: a.link, target: '_blank', title: t('career.vacancy') }, icon('up', 14))),
   );
@@ -284,6 +289,58 @@ function statsStrip(st, apps, weeklyGoal) {
     item(t('career.stat.interviews'), String(st.interviews)),
     item(t('career.stat.offers'), String(st.offers)),
     item(t('career.stat.planned'), String(apps.filter((a) => a.status === 'wish').length)),
+  );
+}
+
+function searchModal(s) {
+  const isNew = !s;
+  formModal(
+    isNew ? t('jobs.newSearch') : s.was,
+    [
+      { key: 'was', label: t('jobs.was'), required: true, placeholder: t('jobs.wasPh') },
+      { key: 'wo', label: t('career.city'), required: true, placeholder: 'Berlin', half: true },
+      { key: 'umkreis', label: t('jobs.radius'), type: 'number', half: true },
+      { key: 'type', label: t('common.type'), type: 'select', options: JOB_TYPES.map((k) => [k, t(`career.kind.${k}`)]) },
+    ],
+    { was: '', wo: '', umkreis: 25, type: 'ausbildung', ...s },
+    {
+      onSave: (v) => {
+        const rec = { ...(s || { id: uid() }), ...v, umkreis: Math.min(200, Math.max(0, Math.round(v.umkreis || 25))) };
+        update((d) => (d.jobs.searches = isNew ? [...d.jobs.searches, rec] : d.jobs.searches.map((x) => (x.id === s.id ? rec : x))));
+        if (isNew) checkJobs({ silent: false });
+      },
+      onDelete: isNew ? null : () => update((d) => (d.jobs.searches = d.jobs.searches.filter((x) => x.id !== s.id))),
+    },
+  );
+}
+
+/** Saved searches at the Arbeitsagentur, checked once a day. */
+function jobsCard() {
+  const { searches, lastRun, error } = state.data.jobs;
+  return card(
+    t('jobs.title'),
+    h('button', { class: 'btn ghost sm', onclick: () => searchModal(null) }, icon('plus', 14), t('jobs.search')),
+    searches.length
+      ? h(
+          'div',
+          { class: 'list' },
+          searches.map((s) =>
+            h(
+              'div',
+              { class: 'list-row compact', style: { cursor: 'pointer' }, onclick: () => searchModal(s) },
+              h('div', { class: 'grow' }, h('div', { class: 'title' }, s.was), h('div', { class: 'meta' }, `${t(`career.kind.${s.type}`)} · ${s.wo} · ${t('jobs.km', { n: s.umkreis })}`)),
+              icon('edit', 14),
+            ),
+          ),
+        )
+      : h('p', { class: 'meta', style: { margin: '0 0 6px' } }, t('jobs.empty')),
+    searches.length > 0 &&
+      h(
+        'div',
+        { class: 'row', style: { marginTop: '6px' } },
+        h('span', { class: 'meta grow' }, error ? `⚠ ${t('jobs.failed')}` : lastRun ? t('jobs.lastRun', { date: prettyDate(lastRun) }) : t('jobs.never')),
+        h('button', { class: 'btn sm', disabled: isJobsChecking(), onclick: () => checkJobs({ silent: false }) }, isJobsChecking() ? t('sync.running') : t('jobs.checkNow')),
+      ),
   );
 }
 
@@ -356,6 +413,7 @@ export function careerView() {
             ),
           !docsOpen && docsDone < docs.length - 3 && h('button', { class: 'btn ghost sm', onclick: () => ((docsOpen = true), update(() => {})) }, t('common.more', { n: docs.length - docsDone - 3 })),
         ),
+        jobsCard(),
         card(t('career.whereToLook'), null, h('div', { class: 'chips' }, LINKS.map(([name, url]) => h('a', { class: 'chip', href: url, target: '_blank', style: { textDecoration: 'none', color: 'inherit' } }, name)))),
       ),
     ),
