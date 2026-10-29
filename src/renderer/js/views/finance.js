@@ -8,6 +8,7 @@ import { barChart, barList } from '../charts.js';
 import { today, thisMonth, shiftMonth, monthTitle, monthShort, prettyDate, shortDate } from '../dates.js';
 import { totals, inMonth, byCategory, monthlySeries, dailyAverage, toCSV, DEFAULT_CATEGORIES, CAT } from '../finance-calc.js';
 import { catLabel, catValue } from '../labels.js';
+import { upsertRule } from '../rules.js';
 import { budgetsTab, recurringTab, goalsTab } from './finance-extra.js';
 
 const ui = { month: thisMonth(), filter: 'all', query: '', tab: 'ops' };
@@ -107,6 +108,11 @@ export function entryModal(entry) {
         else d.finance.push(rec);
       });
       if (isNew) toast(t(rec.type === 'income' ? 'finance.incomeSaved' : 'finance.expenseSaved', { amount: money(rec.amount) }));
+      // An imported operation got another category: offer to remember it for this description.
+      if (!isNew && entry.desc && rec.category !== entry.category && confirm(t('rules.ask', { desc: entry.desc, category: catLabel(rec.category) }))) {
+        update((d) => (d.rules = upsertRule(d.rules, { id: uid(), field: 'desc', value: entry.desc, category: rec.category, kind: rec.type, createdAt: today() })));
+        toast(t('rules.saved', { desc: entry.desc }));
+      }
     },
     danger:
       !isNew &&

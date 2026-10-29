@@ -15,6 +15,9 @@ import { notesView } from './views/notes.js';
 import { gamesView } from './views/games.js';
 import { grokView } from './views/grok.js';
 import { settingsView } from './views/settings.js';
+import { inboxView } from './views/inbox.js';
+import { newItems } from './inbox.js';
+import { startAccountSync } from './account-sync.js';
 import { register, onDayChange, startScheduler } from './scheduler.js';
 import { checkNotifications } from './notifications.js';
 import { MINUTE } from './notify-calc.js';
@@ -23,6 +26,7 @@ const VIEWS = {
   home: { icon: 'home', render: homeView },
   finance: { icon: 'wallet', render: financeView },
   accounts: { icon: 'card', render: accountsView },
+  inbox: { icon: 'inbox', render: inboxView },
   career: { icon: 'briefcase', render: careerView },
   projects: { icon: 'rocket', render: projectsView },
   channel: { icon: 'send', render: channelView },
@@ -32,7 +36,7 @@ const VIEWS = {
   grok: { icon: 'spark', render: grokView },
   settings: { icon: 'gear', render: settingsView },
 };
-const NAV = [['home'], ['money', 'finance', 'accounts'], ['work', 'career', 'projects', 'channel'], ['personal', 'tasks', 'notes', 'games'], ['assistant', 'grok']];
+const NAV = [['home'], ['money', 'finance', 'accounts', 'inbox'], ['work', 'career', 'projects', 'channel'], ['personal', 'tasks', 'notes', 'games'], ['assistant', 'grok']];
 
 export function go(view, opts) {
   state.view = view;
@@ -44,7 +48,15 @@ export function go(view, opts) {
 function navItem(key) {
   const v = VIEWS[key];
   const label = t(`nav.${key}`);
-  return h('button', { class: `nav-item${state.view === key ? ' active' : ''}`, 'data-view': key, title: label, onclick: () => go(key) }, icon(v.icon), h('span', { class: 'nav-label' }, label));
+  // The inbox shows how many items wait for a decision.
+  const count = key === 'inbox' ? newItems(state.data.inbox).length : 0;
+  return h(
+    'button',
+    { class: `nav-item${state.view === key ? ' active' : ''}`, 'data-view': key, title: count ? `${label}: ${count}` : label, onclick: () => go(key) },
+    icon(v.icon),
+    h('span', { class: 'nav-label' }, label),
+    count > 0 && h('span', { class: 'nav-count' }, String(count)),
+  );
 }
 
 // Below this width the menu collapses to icons on its own.
@@ -208,6 +220,8 @@ async function boot() {
   onDayChange(checkRecurring);
   register('notify', MINUTE, () => checkNotifications());
   render();
+  // Background tasks are registered before the first check, so they run right after start.
+  await startAccountSync();
   startScheduler();
 }
 

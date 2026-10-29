@@ -1,14 +1,20 @@
 // Settings: language, Grok key and model, appearance, tray and autostart, notifications, data folder and backups.
 import { state, update } from '../state.js';
-import { h, card, toast, icon } from '../ui.js';
+import { h, card, toast, icon, uid } from '../ui.js';
 import { t, LANGS, num } from '../i18n.js';
 import { setTheme, setLanguage, applyMedia } from '../app.js';
 import { dateTime, prettyDate } from '../dates.js';
 import { resetGrokKeyCache } from './grok.js';
+import { convert } from '../planner-calc.js';
+import { CURRENCY } from '../mono-import.js';
+import { accountName } from '../labels.js';
+import { checkMono, syncMono, isSyncing, monoErrorText } from '../account-sync.js';
+import { monoLabel } from './accounts.js';
 
 let models = null;
 let keySet = null;
 let backups = null;
+let monoSet = null;
 let backupsAt = 0;
 
 function seg(options, value, onPick) {
@@ -77,6 +83,126 @@ function timeInput(value, onChange) {
 }
 
 const setNotify = (key, value) => update((d) => (d.settings.notify[key] = value));
+
+/** A Monobank card as its own planner account. */
+function monoAsAccount(m) {
+  const cur = CURRENCY[m.currencyCode];
+  update((d) =>
+    d.accounts.push({ id: uid(), name: `Monobank${m.pan ? ` ·· ${m.pan}` : ''} ${cur}`, currency: cur, balance: m.balance / 100, updatedAt: '', history: [], sync: { kind: 'mono', monoIds: [m.id], error: '' } }),
+  );
+  syncMono();
+}
+
+/** A goal that follows a jar: its balance and target come from Monobank. */
+function jarAsGoal(j) {
+  const cur = CURRENCY[j.currencyCode];
+  const main = state.data.settings.currency;
+  const target = j.goal > 0 ? convert(j.goal / 100, cur, main, state.data.rates) : Math.max(1, convert(j.balance / 100, cur, main, state.data.rates));
+  update((d) => d.goals.push({ id: uid(), title: j.title, target: Math.round(target * 100) / 100, deadline: '', contributions: [], jarId: j.id }));
+  syncMono();
+  toast(t('mono.goalCreated', { title: j.title }));
+}
+
+function monoCard() {
+  const c = monoCardBody();
+  c.dataset.section = 'mono';
+  return c;
+}
+
+function monoCardBody() {
+  if (monoSet === null) {
+    monoSet = false;
+    window.api.secrets.has('mono').then((v) => {
+      monoSet = v;
+      if (state.view === 'settings') update(() => {});
+    });
+  }
+  const m = state.data.mono;
+  const tokenInput = h('input', { class: 'input', type: 'password', placeholder: monoSet ? t('mono.tokenReplacePh') : t('mono.tokenPh'), style: { width: '280px' } });
+  const owner = (id) => state.data.accounts.find((a) => a.sync?.kind === 'mono' && a.sync.monoIds?.includes(id));
+  const cards = m.accounts.filter((a) => CURRENCY[a.currencyCode]);
+  return card(
+    t('mono.title'),
+    null,
+    h(
+      'div',
+      { class: 'list' },
+      settingRow(
+        t('mono.token'),
+        h('span', {}, monoSet ? t('settings.keyStored') : t('settings.keyNone'), t('mono.tokenGet'), h('a', { href: 'https://api.monobank.ua/', target: '_blank', style: { color: 'inherit' } }, 'api.monobank.ua'), '.'),
+        h(
+          'div',
+          { class: 'row' },
+          tokenInput,
+          h(
+            'button',
+            {
+              class: 'btn primary',
+              onclick: async () => {
+                const v = tokenInput.value.trim();
+                if (!v) return;
+                monoSet = await window.api.secrets.set('mono', v);
+                toast(t('mono.tokenSaved'));
+                update(() => {});
+              },
+            },
+            t('common.save'),
+          ),
+          monoSet &&
+            h(
+              'button',
+              {
+                class: 'btn ghost',
+                onclick: async () => {
+                  monoSet = await window.api.secrets.set('mono', '');
+                  toast(t('mono.tokenRemoved'));
+                  update(() => {});
+                },
+              },
+              t('common.delete'),
+            ),
+        ),
+      ),
+      settingRow(
+        t('mono.status'),
+        m.error ? `⚠ ${monoErrorText(m.error)}` : m.fetchedAt ? t('mono.fetched', { time: dateTime(m.fetchedAt), accounts: cards.length, jars: m.jars.length }) : t('mono.never'),
+        h(
+          'button',
+          {
+            class: 'btn',
+            disabled: !monoSet || isSyncing('mono'),
+            onclick: async () => {
+              toast(t('mono.checking'));
+              const res = await checkMono();
+              toast(res.ok ? t('mono.checked', { accounts: res.accounts.length, jars: res.jars.length }) : monoErrorText(res.error));
+            },
+          },
+          isSyncing('mono') ? t('sync.running') : t('mono.check'),
+        ),
+      ),
+      ...cards.map((c) => {
+        const acc = owner(c.id);
+        return h(
+          'div',
+          { class: 'list-row compact' },
+          h('div', { class: 'grow' }, h('div', { class: 'title' }, monoLabel(c)), h('div', { class: 'meta' }, acc ? t('mono.inAccount', { name: accountName(acc) }) : t('mono.notLinked'))),
+          !acc && h('button', { class: 'btn ghost sm', title: t('mono.asAccountHint'), onclick: () => monoAsAccount(c) }, t('mono.asAccount')),
+        );
+      }),
+      ...m.jars.map((j) => {
+        const goal = state.data.goals.find((g) => g.jarId === j.id);
+        const cur = CURRENCY[j.currencyCode] || '';
+        return h(
+          'div',
+          { class: 'list-row compact' },
+          h('div', { class: 'grow' }, h('div', { class: 'title' }, `🫙 ${j.title}`), h('div', { class: 'meta' }, [`${num(j.balance / 100)} ${cur}`, j.goal > 0 && t('mono.jarGoal', { v: `${num(j.goal / 100)} ${cur}` }), goal && t('mono.inGoal', { title: goal.title })].filter(Boolean).join(' · '))),
+          !goal && cur && h('button', { class: 'btn ghost sm', onclick: () => jarAsGoal(j) }, t('mono.asGoal')),
+        );
+      }),
+      cards.length > 0 && h('p', { class: 'meta', style: { margin: '8px 4px 0' } }, t('mono.pickHint')),
+    ),
+  );
+}
 
 function notificationsCard() {
   const n = state.data.settings.notify;
@@ -385,6 +511,7 @@ export function settingsView() {
           ),
         ),
       ),
+      monoCard(),
       notificationsCard(),
       card(t('settings.data'), null, h('div', { class: 'list' }, settingRow(t('settings.whereStored'), t('settings.whereStoredHint'), h('button', { class: 'btn', onclick: () => window.api.openDataDir() }, t('settings.openFolder'))))),
       backupsCard(),

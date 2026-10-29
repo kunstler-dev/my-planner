@@ -8,6 +8,8 @@ const path = require('path');
 const { createStore } = require('./store');
 const { createSecrets } = require('./secrets');
 const { streamChat, listModels } = require('./grok');
+const { validAddress, walletBalances } = require('./wallet');
+const { createMono } = require('./mono');
 
 if (process.env.PLANNER_DATA_DIR) app.setPath('userData', process.env.PLANNER_DATA_DIR);
 // Keeps WebGL (pet corner) working on machines without a usable GPU.
@@ -185,7 +187,7 @@ function applyAutoStart(on) {
   app.setLoginItemSettings({ openAtLogin: !!on, path: exe, args: ['--hidden'] });
 }
 
-const NOTIFY_VIEWS = ['home', 'finance', 'accounts', 'career', 'projects', 'channel', 'tasks', 'notes', 'games', 'grok', 'settings'];
+const NOTIFY_VIEWS = ['home', 'finance', 'accounts', 'career', 'projects', 'channel', 'tasks', 'notes', 'games', 'grok', 'settings', 'inbox'];
 const clip = (v, max) => String(v ?? '').slice(0, max);
 
 app.on('second-instance', showWindow);
@@ -276,7 +278,8 @@ app.whenReady().then(() => {
     applyAutoStart(!!data?.settings?.autoStart);
     return true;
   });
-  ipcMain.handle('app:info', () => ({ version: app.getVersion(), dataDir: dir, packaged: app.isPackaged }));
+  // demo: dev runs on demo data (PLANNER_SILENT) skip notifications and background bank/wallet updates.
+  ipcMain.handle('app:info', () => ({ version: app.getVersion(), dataDir: dir, packaged: app.isPackaged, demo: !!process.env.PLANNER_SILENT }));
   ipcMain.handle('app:openDataDir', () => shell.openPath(dir));
   // Translated strings for the main process (tray, dialogs); the tray appears once they arrive.
   ipcMain.handle('app:strings', (_e, dict) => {
@@ -356,6 +359,42 @@ app.whenReady().then(() => {
       return { ok: false, error: 'network', message: err.message };
     }
   });
+
+  // Trust Wallet: public addresses only, checked here again.
+  ipcMain.handle('wallet:balances', async (_e, list) => {
+    const addresses = (Array.isArray(list) ? list : [])
+      .slice(0, 20)
+      .map((x) => ({ network: String(x?.network || ''), address: String(x?.address || '').trim() }))
+      .filter((x) => validAddress(x.network, x.address));
+    if (!addresses.length) return { ok: false, error: 'no_addresses' };
+    try {
+      return { ok: true, ...(await walletBalances(addresses)) };
+    } catch (err) {
+      return { ok: false, error: err.code || 'network', message: err.message };
+    }
+  });
+
+  // Monobank: the token stays here; only the fields the planner needs go to the page (no name, ids for
+  // send.monobank.ua, webhook or full card numbers).
+  const mono = createMono(() => secrets.get('mono'));
+  ipcMain.handle('mono:clientInfo', async () => {
+    const res = await mono.clientInfo();
+    if (!res.ok) return res;
+    const d = res.data || {};
+    return {
+      ok: true,
+      accounts: (d.accounts || []).map((a) => ({
+        id: String(a.id),
+        currencyCode: Number(a.currencyCode),
+        balance: Number(a.balance) || 0,
+        creditLimit: Number(a.creditLimit) || 0,
+        type: String(a.type || ''),
+        pan: String((a.maskedPan || [])[0] || '').slice(-4),
+      })),
+      jars: (d.jars || []).map((j) => ({ id: String(j.id), title: String(j.title || '').slice(0, 80), currencyCode: Number(j.currencyCode), balance: Number(j.balance) || 0, goal: Number(j.goal) || 0 })),
+    };
+  });
+  ipcMain.handle('mono:statement', (_e, account, from, to) => mono.statement(account, from, to));
 
   // The renderer may only ask whether a secret exists and replace it; values never leave the main process.
   // The PIN will get its own handler (stored as a hash), so it is not settable here.

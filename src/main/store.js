@@ -73,7 +73,17 @@ function defaultData() {
     sync: {},
     // Notification journal: id → date it was last shown (one per day).
     notified: {},
+    // «Always this category for …» rules for imported operations and e-mails.
+    rules: [],
+    // Operations and messages waiting for a decision.
+    inbox: [],
+    // Monobank cache from client-info (no names or full card numbers) and the newest operation time per account.
+    mono: defaultMono(),
   };
+}
+
+function defaultMono() {
+  return { accounts: [], jars: [], fetchedAt: 0, last: {}, error: '' };
 }
 
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -132,6 +142,9 @@ function normalize(raw) {
     chat: arr(raw.chat),
     sync: obj(raw.sync),
     notified: obj(raw.notified),
+    rules: arr(raw.rules),
+    inbox: arr(raw.inbox),
+    mono: { ...defaultMono(), ...obj(raw.mono), accounts: arr(raw.mono?.accounts), jars: arr(raw.mono?.jars), last: obj(raw.mono?.last) },
   };
 }
 

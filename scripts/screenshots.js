@@ -53,8 +53,28 @@ function demoData() {
   // v3 sections (the rest of the object is v1 data, to exercise the migration).
   const v3 = {
     accounts: [
-      { id: 'trust', name: 'Trust Wallet (крипта)', currency: '$', balance: 840, updatedAt: day(3), history: [{ date: day(20), balance: 700 }, { date: day(3), balance: 840 }] },
-      { id: 'ua', name: 'Украинская карта', currency: '₴', balance: 12500, updatedAt: day(1), history: [{ date: day(20), balance: 9000 }, { date: day(1), balance: 12500 }] },
+      // Automatic accounts with made-up addresses and cards; demo runs never contact the networks or the bank.
+      {
+        id: 'trust',
+        name: 'Trust Wallet (крипта)',
+        currency: '$',
+        balance: 840,
+        updatedAt: day(3),
+        history: [{ date: day(20), balance: 700 }, { date: day(3), balance: 840 }],
+        sync: {
+          kind: 'trust',
+          lastSync: Date.now() - 25 * 60000,
+          error: '',
+          addresses: [{ network: 'tron', address: `T${'X'.repeat(33)}` }, { network: 'bsc', address: `0x${'0'.repeat(40)}` }],
+          breakdown: [
+            { network: 'tron', address: `T${'X'.repeat(33)}`, symbol: 'TRX', amount: 300, usd: 99.4 },
+            { network: 'tron', address: `T${'X'.repeat(33)}`, symbol: 'USDT', amount: 640.6, usd: 640.6 },
+            { network: 'bsc', address: `0x${'0'.repeat(40)}`, symbol: 'BNB', amount: 0.134, usd: 100 },
+            { network: 'bsc', address: `0x${'0'.repeat(40)}`, symbol: 'USDT', amount: 0, usd: 0 },
+          ],
+        },
+      },
+      { id: 'ua', name: 'Украинская карта', currency: '₴', balance: 12500, updatedAt: day(1), history: [{ date: day(20), balance: 9000 }, { date: day(1), balance: 12500 }], sync: { kind: 'mono', monoIds: ['demo-black'], lastSync: Date.now() - 12 * 60000, error: '' } },
       { id: 'de', name: 'Немецкая карта', currency: '€', balance: 1630, updatedAt: day(0), history: [{ date: day(20), balance: 1200 }, { date: day(0), balance: 1630 }] },
     ],
     budgets: { Еда: 12000, Развлечения: 2000, Транспорт: 4000 },
@@ -63,7 +83,26 @@ function demoData() {
       { id: 'r2', active: true, type: 'expense', title: 'Spotify', amount: 11, category: 'Связь и подписки', day: 2, next: day(-5) },
       { id: 'r3', active: true, type: 'income', title: 'Зарплата', amount: 60000, category: 'Зарплата', day: 25, next: day(-27) },
     ],
-    goals: [{ id: 'g1', title: 'Подушка безопасности', target: 3000, deadline: day(-180), contributions: [{ amount: 900, date: day(30) }] }],
+    goals: [
+      { id: 'g1', title: 'Подушка безопасности', target: 3000, deadline: day(-180), contributions: [{ amount: 900, date: day(30) }] },
+      { id: 'g2', title: 'На ноутбук', target: 800, deadline: '', jarId: 'demo-jar', jarSync: Date.now() - 12 * 60000, contributions: [{ amount: 250, date: day(10), auto: true }] },
+    ],
+    mono: {
+      accounts: [
+        { id: 'demo-black', currencyCode: 980, balance: 1250000, creditLimit: 0, type: 'black', pan: '0000' },
+        { id: 'demo-eur', currencyCode: 978, balance: 4200, creditLimit: 0, type: 'black', pan: '' },
+      ],
+      jars: [{ id: 'demo-jar', title: 'На ноутбук', currencyCode: 980, balance: 1250000, goal: 4000000 }],
+      fetchedAt: Date.now() - 12 * 60000,
+      last: {},
+      error: '',
+    },
+    rules: [{ id: 'ru1', field: 'desc', value: 'silpo', category: 'Еда', kind: 'expense', createdAt: day(5) }],
+    inbox: [
+      { id: 'in1', source: 'mono', kind: 'transfer', title: 'Переказ на банку «На ноутбук»', desc: 'Переказ на банку «На ноутбук»', amount: 24, currency: '€', date: day(0), category: null, ref: 'demo-op-1', status: 'new', createdAt: day(0), accountId: 'ua', origAmount: 1000, origCurrency: '₴' },
+      { id: 'in2', source: 'mono', kind: 'income', title: 'Від: Олена К.', desc: 'Від: Олена К.', amount: 36, currency: '€', date: day(1), category: 'Подарок', ref: 'demo-op-2', status: 'new', createdAt: day(1), accountId: 'ua', origAmount: 1500, origCurrency: '₴' },
+      { id: 'in3', source: 'mono', kind: 'transfer', title: 'Банкомат', desc: 'Банкомат', amount: 48, currency: '€', date: day(2), category: null, ref: 'demo-op-3', status: 'new', createdAt: day(2), accountId: 'ua', origAmount: 2000, origCurrency: '₴', hold: true },
+    ],
     habits: [
       { id: 'h1', title: '30 минут немецкого', days: [day(0), day(1), day(2), day(3), day(5)] },
       { id: 'h2', title: 'Один отклик в день', days: [day(1), day(2)] },
@@ -111,6 +150,11 @@ function demoData() {
     ],
   };
   finance.push({ id: 'pf1', type: 'income', amount: 300, category: 'Продажи', date: day(3), note: 'Заказ', projectId: 'pr1' });
+  // Imported from Monobank (made up).
+  finance.push(
+    { id: 'm1', type: 'expense', amount: 7.4, category: 'Еда', date: day(0), note: 'Silpo', desc: 'Silpo', source: 'mono', extId: 'demo-m1', accountId: 'ua', origAmount: 310, origCurrency: '₴' },
+    { id: 'm2', type: 'expense', amount: 3.1, category: 'Транспорт', date: day(1), note: 'Uklon', desc: 'Uklon', source: 'mono', extId: 'demo-m2', accountId: 'ua', origAmount: 130, origCurrency: '₴', hold: true },
+  );
   return { ...v3, version: 1, settings: { theme: 'light', lang, currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
     { role: 'user', content: 'Посмотри на мои финансы и скажи, где я теряю деньги.' },
     { role: 'assistant', content: '### Коротко\nТы откладываешь **~40%** дохода — это хорошо.\n\n- Реклама канала: 5 тыс. ₽/мес — проверь окупаемость закупов\n- Еда: можно срезать 10–15%\n\n1. Заведи лимит на развлечения\n2. Считай цену подписчика с каждого закупа' },
@@ -168,6 +212,7 @@ app.on('browser-window-created', (_e, win) => {
           ['home'],
           ['finance', ['budgets', 'recurring', 'goals', 'ops']],
           ['accounts'],
+          ['inbox'],
           ['career'],
           ['projects'],
           ['channel', ['plan', 'ads', 'stats']],
@@ -178,7 +223,7 @@ app.on('browser-window-created', (_e, win) => {
           ['settings'],
         ];
         for (const [name, tabs] of views) {
-          if (theme === 'dark' && !['home', 'finance', 'career', 'games', 'settings'].includes(name)) continue;
+          if (theme === 'dark' && !['home', 'finance', 'accounts', 'inbox', 'career', 'games', 'settings'].includes(name)) continue;
           await click(name);
           if (name === 'grok') await wait(6000);
           await shot(`${name}-${theme}`);
@@ -190,12 +235,23 @@ app.on('browser-window-created', (_e, win) => {
             await shot('home-collapsed-light');
             await js(`document.querySelector('.sidebar-toggle').click()`);
           }
+          if (name === 'accounts' && theme === 'light') {
+            const esc = `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`;
+            await js(`document.querySelectorAll('main .card.stat')[1].click()`);
+            await shot('accounts-breakdown-light');
+            await js(esc);
+            await js(`document.querySelector('main .list .list-row').querySelectorAll('.btn')[2].click()`);
+            await shot('accounts-trust-modal-light');
+            await js(esc);
+          }
           if (name === 'career' && theme === 'light') {
             await js(`document.querySelector('.status-pill .pill').click()`);
             await shot('career-status-menu-light');
             await js(`document.querySelector('.pill-menu').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
           }
           if (name === 'settings') {
+            await js(`document.querySelector('[data-section=mono]').scrollIntoView({ block: 'center' })`);
+            await shot(`settings-mono-${theme}`);
             await js(`document.getElementById('main').scrollTop = 1e6`);
             await shot(`settings-bottom-${theme}`);
             if (theme === 'light') {
