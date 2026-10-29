@@ -53,6 +53,9 @@ function defaultData() {
       mail: defaultMail(),
       // Global shortcut for the quick entry window (Electron accelerator).
       quickKey: 'Ctrl+Alt+Space',
+      // Steam profile (SteamID64) for OpenDota and the wishlist import; daily wishlist sync is optional.
+      steamId: '',
+      steamWishlistSync: false,
     },
     // Units of each currency per 1 €; refreshed from the NBU or typed by hand.
     rates: { '€': 1, '₴': 48, $: 1.08, updatedAt: '' },
@@ -89,6 +92,8 @@ function defaultData() {
     bills: [],
     // Saved job searches, «not interested» refnr and the last daily check.
     jobs: defaultJobs(),
+    // OpenDota cache: profile and rank, win/loss for 30 days, last 20 matches, hero names.
+    dota: { profile: null, wl: null, matches: [], heroes: {}, fetchedAt: 0, error: '' },
   };
 }
 
@@ -166,6 +171,7 @@ function normalize(raw) {
     inbox: arr(raw.inbox),
     mailRules: arr(raw.mailRules),
     bills: arr(raw.bills),
+    dota: { profile: null, wl: null, matches: [], heroes: {}, fetchedAt: 0, error: '', ...obj(raw.dota), matches: arr(raw.dota?.matches), heroes: obj(raw.dota?.heroes) },
     jobs: { ...defaultJobs(), ...obj(raw.jobs), searches: arr(raw.jobs?.searches), ignored: arr(raw.jobs?.ignored) },
     mono: { ...defaultMono(), ...obj(raw.mono), accounts: arr(raw.mono?.accounts), jars: arr(raw.mono?.jars), last: obj(raw.mono?.last) },
   };

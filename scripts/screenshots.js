@@ -104,6 +104,15 @@ function demoData() {
       error: '',
     },
     jobs: { searches: [{ id: 'js1', was: 'Fachinformatiker', wo: 'Berlin', umkreis: 30, type: 'ausbildung' }], ignored: [], lastRun: day(0), found: null, error: '' },
+    // OpenDota cache with made-up matches (demo runs never call OpenDota).
+    dota: {
+      profile: { name: 'demo', rankTier: 54, leaderboard: null },
+      wl: { win: 18, lose: 12 },
+      heroes: { 14: 'Pudge', 8: 'Juggernaut', 74: 'Invoker', 86: 'Rubick', 2: 'Axe' },
+      matches: Array.from({ length: 20 }, (_, i) => ({ match_id: 9000 + i, hero_id: [14, 14, 8, 74, 14, 86, 2, 8][i % 8], player_slot: i % 3 ? 1 : 130, radiant_win: i % 4 !== 1, kills: 3 + ((i * 7) % 12), deaths: 1 + ((i * 5) % 9), assists: 4 + ((i * 3) % 14), duration: 1500 + ((i * 337) % 1500), start_time: Math.floor(now.getTime() / 1000) - i * 30000 })),
+      fetchedAt: Date.now() - 40 * 60000,
+      error: '',
+    },
     rules: [{ id: 'ru1', field: 'desc', value: 'silpo', category: 'Еда', kind: 'expense', createdAt: day(5) }],
     // Letters (made up): a phone bill due soon, a receipt matching a bank operation, an invitation, a failed payment.
     bills: [{ id: 'b1', title: 'Vodafone', amount: 39.99, dueDate: day(-3), paid: false, ref: 'mail:demo-voda@example.test', category: 'Связь и подписки' }],
@@ -172,7 +181,7 @@ function demoData() {
     { id: 'm1', type: 'expense', amount: 7.4, category: 'Еда', date: day(0), note: 'Silpo', desc: 'Silpo', source: 'mono', extId: 'demo-m1', accountId: 'ua', origAmount: 310, origCurrency: '₴' },
     { id: 'm2', type: 'expense', amount: 3.1, category: 'Транспорт', date: day(1), note: 'Uklon', desc: 'Uklon', source: 'mono', extId: 'demo-m2', accountId: 'ua', origAmount: 130, origCurrency: '₴', hold: true },
   );
-  return { ...v3, version: 1, settings: { theme: 'light', lang, mail: { enabled: true, address: 'name@example.com', interval: 15, grok: false }, currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
+  return { ...v3, version: 1, settings: { theme: 'light', lang, steamId: '76561190000000001', mail: { enabled: true, address: 'name@example.com', interval: 15, grok: false }, currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
     { role: 'user', content: 'Посмотри на мои финансы и скажи, где я теряю деньги.' },
     { role: 'assistant', content: '### Коротко\nТы откладываешь **~40%** дохода — это хорошо.\n\n- Реклама канала: 5 тыс. ₽/мес — проверь окупаемость закупов\n- Еда: можно срезать 10–15%\n\n1. Заведи лимит на развлечения\n2. Считай цену подписчика с каждого закупа' },
   ] };

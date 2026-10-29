@@ -61,6 +61,11 @@ contextBridge.exposeInMainWorld('api', {
     search: (term) => ipcRenderer.invoke('steam:search', term),
     prices: (ids) => ipcRenderer.invoke('steam:prices', ids),
     app: (id) => ipcRenderer.invoke('steam:app', id),
+    resolve: (vanity) => ipcRenderer.invoke('steam:resolve', vanity),
+    wishlist: (id64) => ipcRenderer.invoke('steam:wishlist', id64),
+  },
+  opendota: {
+    get: (p) => ipcRenderer.invoke('opendota:get', p),
   },
   grokWeb: {
     logout: () => ipcRenderer.invoke('grokweb:logout'),

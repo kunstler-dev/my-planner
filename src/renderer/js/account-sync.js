@@ -11,6 +11,7 @@ import { CURRENCY, importStatement, statementWindows, nextFrom, jarContribution 
 import { pruneInbox } from './inbox.js';
 import { scheduleMail } from './mail-sync.js';
 import { checkJobs } from './jobs-sync.js';
+import { syncDota, importWishlist } from './games-sync.js';
 import { refreshPrices } from './views/games.js';
 
 const running = new Set();
@@ -193,5 +194,8 @@ export async function startAccountSync() {
   register('steam-prices', 24 * 60 * MINUTE, () => refreshPrices({ silent: true }));
   scheduleMail();
   register('jobs', 24 * 60 * MINUTE, () => checkJobs());
+  // OpenDota every 2 hours (free tier: 60 requests a minute, four per update); the Steam wishlist daily if on.
+  register('dota', 120 * MINUTE, () => syncDota());
+  register('steam-wishlist', 24 * 60 * MINUTE, () => (state.data.settings.steamWishlistSync ? importWishlist() : null));
   register('inbox-prune', 24 * 60 * MINUTE, () => update((d) => (d.inbox = pruneInbox(d.inbox, today())), { silent: true }));
 }

@@ -314,6 +314,44 @@ app.whenReady().then(() => {
       return { ok: false, error: 'network', message: err.message };
     }
   });
+  // Steam profile: a custom URL name → SteamID64 through the public XML profile.
+  ipcMain.handle('steam:resolve', async (_e, vanity) => {
+    const name = String(vanity || '');
+    if (!/^[\w-]{2,64}$/.test(name)) return { ok: false, error: 'bad_name' };
+    try {
+      const res = await fetch(`https://steamcommunity.com/id/${name}/?xml=1`, { signal: AbortSignal.timeout(15000) });
+      const id = (await res.text()).match(/<steamID64>(\d{17})<\/steamID64>/)?.[1];
+      return id ? { ok: true, id64: id } : { ok: false, error: 'not_found' };
+    } catch (err) {
+      return { ok: false, error: 'network', message: err.message };
+    }
+  });
+  // Public wishlist of a profile (it must be public in Steam).
+  ipcMain.handle('steam:wishlist', async (_e, id64) => {
+    if (!/^\d{17}$/.test(String(id64))) return { ok: false, error: 'bad_id' };
+    try {
+      const res = await fetch(`https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=${id64}`, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) return { ok: false, error: 'http' };
+      const items = (await res.json())?.response?.items;
+      if (!Array.isArray(items)) return { ok: false, error: 'private' };
+      return { ok: true, ids: items.map((x) => Number(x.appid)).filter((n) => n > 0).slice(0, 500) };
+    } catch (err) {
+      return { ok: false, error: 'network', message: err.message };
+    }
+  });
+  // OpenDota (free tier, 60 requests a minute): only the endpoints the planner uses.
+  ipcMain.handle('opendota:get', async (_e, p) => {
+    const pathOk = typeof p === 'string' && /^\/(heroes|players\/\d{1,12}(\/wl\?date=30|\/recentMatches)?)$/.test(p);
+    if (!pathOk) return { ok: false, error: 'bad_path' };
+    try {
+      const res = await fetch(`https://api.opendota.com/api${p}`, { signal: AbortSignal.timeout(20000) });
+      if (res.status === 429) return { ok: false, error: 'rate' };
+      if (!res.ok) return { ok: false, error: 'http' };
+      return { ok: true, data: await res.json() };
+    } catch (err) {
+      return { ok: false, error: 'network', message: err.message };
+    }
+  });
   ipcMain.handle('grokweb:logout', async () => {
     await session.fromPartition(GROK_PARTITION).clearStorageData();
     return true;
