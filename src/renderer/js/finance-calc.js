@@ -2,7 +2,7 @@
 
 export const DEFAULT_CATEGORIES = {
   income: ['Зарплата', 'Фриланс', 'Реклама в канале', 'Продажи', 'Kindergeld / пособия', 'Подарок', 'Другое'],
-  expense: ['Еда', 'Транспорт', 'Жильё', 'Связь и подписки', 'Реклама канала', 'Развлечения', 'Игры', 'Учёба и курсы', 'Одежда', 'Здоровье', 'Другое'],
+  expense: ['Еда', 'Транспорт', 'Жильё', 'Связь и подписки', 'Покупки', 'Реклама канала', 'Развлечения', 'Игры', 'Учёба и курсы', 'Одежда', 'Здоровье', 'Другое'],
 };
 
 // Standard categories are stored by their Russian name (the key for budgets, rules and MCC) and shown translated.
@@ -17,6 +17,7 @@ export const CATEGORY_KEYS = {
   Транспорт: 'transport',
   Жильё: 'housing',
   'Связь и подписки': 'subscriptions',
+  Покупки: 'shopping',
   'Реклама канала': 'adsExpense',
   Развлечения: 'fun',
   Игры: 'games',

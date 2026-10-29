@@ -32,6 +32,28 @@ function withStatus(app, status) {
   return out;
 }
 
+/** A status letter from the inbox: new status, the sent date if missing, a note with the date and subject. */
+export function applyLetter(item) {
+  const { status, appId } = item.career;
+  update((d) => {
+    const apps = d.career.applications;
+    const i = apps.findIndex((x) => x.id === appId);
+    if (i < 0) return;
+    const cur = { ...apps[i], sentAt: apps[i].sentAt || (status !== 'wish' ? item.date : '') };
+    apps[i] = { ...withStatus(cur, status), note: [apps[i].note, `${item.date}: ${item.subject}`].filter(Boolean).join('\n') };
+  });
+}
+
+/** «Create an application?» for a status letter from a company that isn't in the list yet. */
+export function createFromLetter(item) {
+  const { status, company } = item.career;
+  update((d) =>
+    d.career.applications.push(
+      withStatus({ id: uid(), createdAt: today(), company, position: item.subject, kind: 'ausbildung', city: '', link: '', sentAt: item.date, note: `${item.date}: ${item.subject}` }, status),
+    ),
+  );
+}
+
 function appModal(a) {
   const isNew = !a?.id;
   formModal(

@@ -24,7 +24,7 @@ function defaultDocs() {
 
 // Notification types are switched on by default; quiet hours 23:00–08:00.
 function defaultNotify() {
-  return { recurring: true, budget: true, followUp: true, habits: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
+  return { recurring: true, budget: true, followUp: true, habits: true, bills: true, alerts: true, habitsAt: '20:00', quietFrom: '23:00', quietTo: '08:00' };
 }
 
 function defaultData() {
@@ -49,6 +49,8 @@ function defaultData() {
       // Home cards: { order: [id…], hidden: [id…] }; ids unknown to this version are kept for newer ones.
       homeLayout: { order: [], hidden: [] },
       sidebarCollapsed: false,
+      // Gmail (read only): the app password is the secret «imap», never here.
+      mail: defaultMail(),
     },
     // Units of each currency per 1 €; refreshed from the NBU or typed by hand.
     rates: { '€': 1, '₴': 48, $: 1.08, updatedAt: '' },
@@ -79,7 +81,15 @@ function defaultData() {
     inbox: [],
     // Monobank cache from client-info (no names or full card numbers) and the newest operation time per account.
     mono: defaultMono(),
+    // Sender rules for letters; empty = the built-in ones.
+    mailRules: [],
+    // Bills from letters with a due date: { id, title, amount, dueDate, paid, ref, category }.
+    bills: [],
   };
+}
+
+function defaultMail() {
+  return { enabled: false, address: '', interval: 15, grok: false };
 }
 
 function defaultMono() {
@@ -106,6 +116,8 @@ function normalize(raw) {
   const ids = (v) => arr(v).filter((x) => typeof x === 'string');
   settings.homeLayout = { order: ids(layout.order), hidden: ids(layout.hidden) };
   settings.sidebarCollapsed = settings.sidebarCollapsed === true;
+  settings.mail = { ...defaultMail(), ...obj(raw.settings?.mail) };
+  if (![5, 15, 30, 60].includes(settings.mail.interval)) settings.mail.interval = 15;
   // v1 kept a single channel in `channel`.
   let channels = arr(raw.channels);
   if (!channels.length && raw.channel?.username) channels = [raw.channel];
@@ -144,6 +156,8 @@ function normalize(raw) {
     notified: obj(raw.notified),
     rules: arr(raw.rules),
     inbox: arr(raw.inbox),
+    mailRules: arr(raw.mailRules),
+    bills: arr(raw.bills),
     mono: { ...defaultMono(), ...obj(raw.mono), accounts: arr(raw.mono?.accounts), jars: arr(raw.mono?.jars), last: obj(raw.mono?.last) },
   };
 }

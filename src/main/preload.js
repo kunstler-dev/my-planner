@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld('api', {
   wallet: {
     balances: (addresses) => ipcRenderer.invoke('wallet:balances', addresses),
   },
+  mail: {
+    fetch: (query) => ipcRenderer.invoke('mail:fetch', query),
+    grok: (letter) => ipcRenderer.invoke('mail:grok', letter),
+  },
   mono: {
     clientInfo: () => ipcRenderer.invoke('mono:clientInfo'),
     statement: (account, from, to) => ipcRenderer.invoke('mono:statement', account, from, to),

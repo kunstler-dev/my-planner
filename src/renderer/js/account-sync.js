@@ -9,6 +9,7 @@ import { register } from './scheduler.js';
 import { MINUTE } from './notify-calc.js';
 import { CURRENCY, importStatement, statementWindows, nextFrom, jarContribution } from './mono-import.js';
 import { pruneInbox } from './inbox.js';
+import { scheduleMail } from './mail-sync.js';
 
 const running = new Set();
 export const isSyncing = (key) => running.has(key);
@@ -174,5 +175,6 @@ export async function startAccountSync() {
     for (const a of trustAccounts()) await syncTrust(a.id);
   });
   register('mono', 30 * MINUTE, () => syncMono());
+  scheduleMail();
   register('inbox-prune', 24 * 60 * MINUTE, () => update((d) => (d.inbox = pruneInbox(d.inbox, today())), { silent: true }));
 }

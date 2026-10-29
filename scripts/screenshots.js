@@ -98,9 +98,16 @@ function demoData() {
       error: '',
     },
     rules: [{ id: 'ru1', field: 'desc', value: 'silpo', category: 'Еда', kind: 'expense', createdAt: day(5) }],
+    // Letters (made up): a phone bill due soon, a receipt matching a bank operation, an invitation, a failed payment.
+    bills: [{ id: 'b1', title: 'Vodafone', amount: 39.99, dueDate: day(-3), paid: false, ref: 'mail:demo-voda@example.test', category: 'Связь и подписки' }],
     inbox: [
       { id: 'in1', source: 'mono', kind: 'transfer', title: 'Переказ на банку «На ноутбук»', desc: 'Переказ на банку «На ноутбук»', amount: 24, currency: '€', date: day(0), category: null, ref: 'demo-op-1', status: 'new', createdAt: day(0), accountId: 'ua', origAmount: 1000, origCurrency: '₴' },
       { id: 'in2', source: 'mono', kind: 'income', title: 'Від: Олена К.', desc: 'Від: Олена К.', amount: 36, currency: '€', date: day(1), category: 'Подарок', ref: 'demo-op-2', status: 'new', createdAt: day(1), accountId: 'ua', origAmount: 1500, origCurrency: '₴' },
+      { id: 'in4', source: 'mail', kind: 'alert', title: 'Payment failed', subject: 'Payment failed', sender: 'billing@starlink.com', domain: 'starlink.com', date: day(0), ref: 'mail:demo-sl@example.test', messageId: 'demo-sl@example.test', link: 'https://mail.google.com/', status: 'new', createdAt: day(0) },
+      { id: 'in5', source: 'mail', kind: 'career', title: 'Einladung zum Vorstellungsgespräch', subject: 'Einladung zum Vorstellungsgespräch', sender: 'karriere@siemens.example', domain: 'siemens.example', date: day(0), ref: 'mail:demo-inv@example.test', messageId: 'demo-inv@example.test', link: 'https://mail.google.com/', status: 'new', createdAt: day(0), career: { status: 'interview', appId: 'p2', company: 'Siemens' } },
+      { id: 'in6', source: 'mail', kind: 'expense', title: 'Vodafone', merchant: 'Vodafone', subject: 'Ihre Rechnung', sender: 'rechnung@kundenservice.vodafone.com', domain: 'kundenservice.vodafone.com', amount: 39.99, currency: '€', origAmount: 39.99, origCurrency: '€', date: day(1), dueDate: day(-3), category: 'Связь и подписки', suggested: 'Связь и подписки', ref: 'mail:demo-voda@example.test', messageId: 'demo-voda@example.test', link: 'https://mail.google.com/', status: 'new', createdAt: day(1) },
+      { id: 'in7', source: 'mail', kind: 'expense', title: 'Silpo', merchant: 'Silpo', subject: 'Ваш чек', sender: 'check@silpo.example', domain: 'silpo.example', amount: 7.4, currency: '€', origAmount: 310, origCurrency: '₴', date: day(0), category: 'Еда', suggested: 'Еда', match: 'm1', ref: 'mail:demo-silpo@example.test', messageId: 'demo-silpo@example.test', link: 'https://mail.google.com/', status: 'new', createdAt: day(0) },
+      { id: 'in8', source: 'mail', kind: 'unparsed', title: 'Zahlungserinnerung', subject: 'Zahlungserinnerung', sender: 'info@verein.example', domain: 'verein.example', date: day(2), ref: 'mail:demo-u@example.test', messageId: 'demo-u@example.test', link: 'https://mail.google.com/', status: 'new', createdAt: day(2) },
       { id: 'in3', source: 'mono', kind: 'transfer', title: 'Банкомат', desc: 'Банкомат', amount: 48, currency: '€', date: day(2), category: null, ref: 'demo-op-3', status: 'new', createdAt: day(2), accountId: 'ua', origAmount: 2000, origCurrency: '₴', hold: true },
     ],
     habits: [
@@ -155,7 +162,7 @@ function demoData() {
     { id: 'm1', type: 'expense', amount: 7.4, category: 'Еда', date: day(0), note: 'Silpo', desc: 'Silpo', source: 'mono', extId: 'demo-m1', accountId: 'ua', origAmount: 310, origCurrency: '₴' },
     { id: 'm2', type: 'expense', amount: 3.1, category: 'Транспорт', date: day(1), note: 'Uklon', desc: 'Uklon', source: 'mono', extId: 'demo-m2', accountId: 'ua', origAmount: 130, origCurrency: '₴', hold: true },
   );
-  return { ...v3, version: 1, settings: { theme: 'light', lang, currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
+  return { ...v3, version: 1, settings: { theme: 'light', lang, mail: { enabled: true, address: 'name@example.com', interval: 15, grok: false }, currency: '₽', pets: true, petsColor: false, grokModel: 'grok-4', channel: '' }, finance, tasks, channel: { title: '', username: '', snapshots: [], posts: {}, fetchedAt: 0 }, chat: [
     { role: 'user', content: 'Посмотри на мои финансы и скажи, где я теряю деньги.' },
     { role: 'assistant', content: '### Коротко\nТы откладываешь **~40%** дохода — это хорошо.\n\n- Реклама канала: 5 тыс. ₽/мес — проверь окупаемость закупов\n- Еда: можно срезать 10–15%\n\n1. Заведи лимит на развлечения\n2. Считай цену подписчика с каждого закупа' },
   ] };
@@ -252,6 +259,8 @@ app.on('browser-window-created', (_e, win) => {
           if (name === 'settings') {
             await js(`document.querySelector('[data-section=mono]').scrollIntoView({ block: 'center' })`);
             await shot(`settings-mono-${theme}`);
+            await js(`document.querySelector('[data-section=mail]').scrollIntoView({ block: 'start' })`);
+            await shot(`settings-mail-${theme}`);
             await js(`document.getElementById('main').scrollTop = 1e6`);
             await shot(`settings-bottom-${theme}`);
             if (theme === 'light') {

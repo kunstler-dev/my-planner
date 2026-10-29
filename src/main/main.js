@@ -10,6 +10,7 @@ const { createSecrets } = require('./secrets');
 const { streamChat, listModels } = require('./grok');
 const { validAddress, walletBalances } = require('./wallet');
 const { createMono } = require('./mono');
+const { fetchMail, grokMailMessages, validEmail, validDomain } = require('./mail');
 
 if (process.env.PLANNER_DATA_DIR) app.setPath('userData', process.env.PLANNER_DATA_DIR);
 // Keeps WebGL (pet corner) working on machines without a usable GPU.
@@ -393,6 +394,40 @@ app.whenReady().then(() => {
       })),
       jars: (d.jars || []).map((j) => ({ id: String(j.id), title: String(j.title || '').slice(0, 80), currencyCode: Number(j.currencyCode), balance: Number(j.balance) || 0, goal: Number(j.goal) || 0 })),
     };
+  });
+  // Gmail (read only). The app password stays here; letter texts go to the page in memory for parsing only.
+  let mailBusy = false;
+  ipcMain.handle('mail:fetch', async (_e, q) => {
+    const user = String(q?.user || '').trim();
+    if (!validEmail(user)) return { ok: false, error: 'bad_address' };
+    const pass = secrets.get('imap');
+    if (!pass) return { ok: false, error: 'no_password' };
+    if (mailBusy) return { ok: false, error: 'busy' };
+    mailBusy = true;
+    try {
+      return await fetchMail({
+        user,
+        pass: pass.replace(/\s+/g, ''),
+        lastUid: Number.isInteger(q?.lastUid) && q.lastUid >= 0 ? q.lastUid : 0,
+        uidValidity: String(q?.uidValidity || ''),
+        senders: (Array.isArray(q?.senders) ? q.senders : []).filter(validDomain).slice(0, 50),
+      });
+    } finally {
+      mailBusy = false;
+    }
+  });
+  // Unknown letters through Grok (only when the user turned it on and uses an API key).
+  ipcMain.handle('mail:grok', async (_e, q) => {
+    const key = secrets.get('xai');
+    if (!key) return { ok: false, error: 'no_key' };
+    const str = (v, n) => String(v ?? '').slice(0, n);
+    const categories = (Array.isArray(q?.categories) ? q.categories : []).map((c) => str(c, 60)).slice(0, 60);
+    try {
+      const text = await streamChat({ key, model: str(q?.model, 60) || 'grok-4', messages: grokMailMessages({ from: str(q?.from, 200), subject: str(q?.subject, 300), date: str(q?.date, 40), text: str(q?.text, 3000), categories }), onDelta: () => {} });
+      return { ok: true, text };
+    } catch (err) {
+      return { ok: false, error: err.code || 'http' };
+    }
   });
   ipcMain.handle('mono:statement', (_e, account, from, to) => mono.statement(account, from, to));
 

@@ -73,6 +73,19 @@ export function dueNotifications(data, now = new Date()) {
       out.push({ id: `followUp:${a.id}:${a.followUp}`, type: 'followUp', view: 'career', key: 'notify.followUp', params: { company: a.company, position: a.position } });
     }
   }
+  if (s.bills !== false) {
+    const tomorrow = addDaysIso(today, 1);
+    for (const b of data.bills || []) {
+      if (b.paid || b.dueDate !== tomorrow) continue;
+      out.push({ id: `bill:${b.id}`, once: true, type: 'bills', view: 'home', key: 'notify.bill', params: { title: b.title, amount: Number(b.amount) || 0, type: 'expense' } });
+    }
+  }
+  if (s.alerts !== false) {
+    for (const x of data.inbox || []) {
+      if (x.kind !== 'alert' || x.status !== 'new') continue;
+      out.push({ id: `alert:${x.id}`, once: true, type: 'alerts', view: 'inbox', key: 'notify.alert', params: { title: x.title, sender: x.domain || x.sender || '' } });
+    }
+  }
   if (s.habits !== false && (data.habits || []).length) {
     const at = toMinutes(s.habitsAt) ?? 20 * 60;
     const open = data.habits.filter((hb) => !(hb.days || []).includes(today));

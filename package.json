@@ -1,7 +1,7 @@
 {
   "name": "planner",
   "productName": "Planner",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Black-and-white planner: money, job search, Telegram channels, Grok",
   "main": "src/main/main.js",
   "author": "kunstler-dev",
@@ -25,7 +25,9 @@
       "package.json",
       "!**/*.map",
       "!node_modules/three/{examples,src,docs,editor,manual}/**",
-      "!node_modules/three/build/{three.cjs,three.module.min.js,three.core.min.js,three.webgpu*,three.tsl*}"
+      "!node_modules/three/build/{three.cjs,three.module.min.js,three.core.min.js,three.webgpu*,three.tsl*}",
+      "!node_modules/pdf-parse/lib/pdf.js/{v1.9.426,v1.10.88,v2.0.550}/**",
+      "!node_modules/pdf-parse/test/**"
     ],
     "asar": true,
     "win": {
@@ -40,6 +42,9 @@
     }
   },
   "dependencies": {
+    "imapflow": "2.4.2",
+    "mailparser": "3.9.39",
+    "pdf-parse": "1.1.1",
     "three": "^0.180.0"
   },
   "devDependencies": {
