@@ -43,7 +43,30 @@ export function go(view, opts) {
 
 function navItem(key) {
   const v = VIEWS[key];
-  return h('button', { class: `nav-item${state.view === key ? ' active' : ''}`, 'data-view': key, onclick: () => go(key) }, icon(v.icon), t(`nav.${key}`));
+  const label = t(`nav.${key}`);
+  return h('button', { class: `nav-item${state.view === key ? ' active' : ''}`, 'data-view': key, title: label, onclick: () => go(key) }, icon(v.icon), h('span', { class: 'nav-label' }, label));
+}
+
+// Below this width the menu collapses to icons on its own.
+const narrow = window.matchMedia('(max-width: 1099px)');
+narrow.addEventListener('change', () => render());
+
+/** Density and the collapsed menu are attributes on <html>; CSS does the rest. */
+function applyLayout() {
+  const s = state.data.settings;
+  const root = document.documentElement;
+  root.dataset.density = s.density;
+  if (s.sidebarCollapsed || narrow.matches) root.dataset.sidebar = 'collapsed';
+  else delete root.dataset.sidebar;
+  const brand = document.getElementById('brand');
+  let toggle = brand.querySelector('.sidebar-toggle');
+  if (!toggle) {
+    toggle = h('button', { class: 'sidebar-toggle', onclick: () => update((d) => (d.settings.sidebarCollapsed = !(d.settings.sidebarCollapsed || narrow.matches))) });
+    brand.append(toggle);
+  }
+  const collapsed = !!root.dataset.sidebar;
+  toggle.title = collapsed ? t('nav.expand') : t('nav.collapse');
+  toggle.replaceChildren(icon(collapsed ? 'right' : 'left', 16));
 }
 
 function renderNav() {
@@ -59,12 +82,17 @@ function renderNav() {
   const nextLang = LANGS[(LANGS.indexOf(s.lang) + 1) % LANGS.length];
   document.getElementById('nav-bottom').replaceChildren(
     navItem('settings'),
-    h('button', { class: 'nav-item', 'data-action': 'theme', onclick: () => setTheme(dark ? 'light' : 'dark') }, icon(dark ? 'sun' : 'moon'), dark ? t('nav.lightTheme') : t('nav.darkTheme')),
     h(
       'button',
-      { class: 'nav-item', 'data-action': 'lang', title: t('nav.langHint'), onclick: () => setLanguage(nextLang) },
+      { class: 'nav-item', 'data-action': 'theme', title: dark ? t('nav.lightTheme') : t('nav.darkTheme'), onclick: () => setTheme(dark ? 'light' : 'dark') },
+      icon(dark ? 'sun' : 'moon'),
+      h('span', { class: 'nav-label' }, dark ? t('nav.lightTheme') : t('nav.darkTheme')),
+    ),
+    h(
+      'button',
+      { class: 'nav-item', 'data-action': 'lang', title: `${t('nav.language')}: ${t('nav.langHint')}`, onclick: () => setLanguage(nextLang) },
       icon('globe'),
-      t('nav.language'),
+      h('span', { class: 'nav-label' }, t('nav.language')),
       h('span', { class: 'nav-lang' }, s.lang.toUpperCase()),
     ),
   );
@@ -160,6 +188,7 @@ function onCommand(msg) {
 }
 
 function render() {
+  applyLayout();
   applyMedia();
   renderNav();
   const main = document.getElementById('main');

@@ -141,6 +141,83 @@ function quickAdd() {
   );
 }
 
+/**
+ * Status as a pill with its own dropdown: «want to send» dashed, «sent» outlined, «interview» filled, «offer» filled
+ * with a tick, «rejected» muted and struck through. Keyboard: arrows open and move, Enter picks, Esc closes.
+ */
+function statusPill(a) {
+  const wrap = h('div', { class: 'status-pill' });
+  const label = (k) => [k === 'offer' && icon('check', 12), h('span', { class: 'pill-text' }, t(`status.${k}`))];
+  let menu = null;
+  const outside = (e) => !wrap.contains(e.target) && close(false);
+  const btn = h(
+    'button',
+    {
+      class: `pill ${a.status}`,
+      type: 'button',
+      title: t('common.status'),
+      'aria-haspopup': 'listbox',
+      onclick: () => (menu ? close() : open()),
+      onkeydown: (e) => {
+        if (['ArrowDown', 'ArrowUp'].includes(e.key)) {
+          e.preventDefault();
+          open();
+        }
+      },
+    },
+    h('span', { class: 'row', style: { gap: '4px', minWidth: 0 } }, label(a.status)),
+    icon('chevDown', 12),
+  );
+  function close(focus = true) {
+    menu?.remove();
+    menu = null;
+    document.removeEventListener('mousedown', outside);
+    if (focus) btn.focus();
+  }
+  function open() {
+    if (menu) return;
+    const opts = APP_STATUSES.map(([k]) =>
+      h(
+        'button',
+        {
+          class: `pill ${k}${k === a.status ? ' active' : ''}`,
+          type: 'button',
+          role: 'option',
+          'aria-selected': k === a.status ? 'true' : 'false',
+          onclick: () => {
+            close(false);
+            if (k !== a.status) setStatus(a, k);
+          },
+        },
+        label(k),
+      ),
+    );
+    menu = h(
+      'div',
+      {
+        class: 'pill-menu',
+        role: 'listbox',
+        onkeydown: (e) => {
+          const i = opts.indexOf(document.activeElement);
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            opts[(i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length].focus();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
+          } else if (e.key === 'Tab') close(false);
+        },
+      },
+      opts,
+    );
+    wrap.append(menu);
+    (opts.find((o) => o.classList.contains('active')) || opts[0]).focus();
+    setTimeout(() => document.addEventListener('mousedown', outside), 0);
+  }
+  wrap.append(btn);
+  return wrap;
+}
+
 function appRow(a) {
   const due = isDue(a);
   const meta = [kindLabel(a.kind), a.city, a.status !== 'wish' && a.sentAt && t('career.sentShort', { date: prettyDate(a.sentAt) }), a.start && t('career.startShort', { start: a.start })].filter(Boolean);
@@ -155,17 +232,14 @@ function appRow(a) {
   return h(
     'div',
     { class: `app-row status-${a.status}${due ? ' due' : ''}` },
-    h(
-      'select',
-      { class: 'status-select', title: t('common.status'), onchange: (e) => setStatus(a, e.target.value) },
-      statuses().map(([k, l]) => h('option', { value: k, selected: k === a.status ? 'selected' : null }, l)),
-    ),
+    statusPill(a),
     h(
       'div',
       { class: 'grow', style: { cursor: 'pointer', minWidth: 0 }, onclick: () => appModal(a) },
       h('div', { class: 'title' }, h('b', {}, a.company), ' — ', a.position),
-      h('div', { class: 'meta' }, due ? [t('career.writeAgain'), ...meta].join(' · ') : meta.join(' · ')),
+      h('div', { class: 'meta' }, meta.join(' · ')),
     ),
+    due && h('span', { class: 'due-pill', title: t('career.followUpOn', { date: prettyDate(a.followUp) }) }, t('career.writeAgain')),
     h('div', { class: 'app-actions' }, grok, a.link && h('a', { class: 'btn ghost sm icon-only', href: a.link, target: '_blank', title: t('career.vacancy') }, icon('up', 14))),
   );
 }

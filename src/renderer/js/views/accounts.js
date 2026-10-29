@@ -119,7 +119,7 @@ export function accountsView() {
     ),
     h(
       'div',
-      { class: 'grid cols-4', style: { marginBottom: '16px' } },
+      { class: 'grid cols-4 gap-b' },
       h(
         'div',
         { class: 'card stat dark' },

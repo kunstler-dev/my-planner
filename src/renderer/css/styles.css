@@ -1252,3 +1252,435 @@ textarea.input {
   max-height: 260px;
   overflow-y: auto;
 }
+
+/* ================= Stage 1: density, compact rows, collapsible menu, status pills ================= */
+
+/* Density: «spacious» keeps the roomy look, «compact» (default) removes empty space. */
+:root {
+  --pad-y: 20px;
+  --pad-x: 22px;
+  --gap: 16px;
+  --stat-size: 30px;
+  --h1-size: 28px;
+  --row-y: 10px;
+  --main-pad: 28px 32px 48px;
+  --head-gap: 22px;
+}
+:root[data-density='compact'] {
+  --pad-y: 14px;
+  --pad-x: 14px;
+  --gap: 12px;
+  --stat-size: 24px;
+  --h1-size: 24px;
+  --row-y: 7px;
+  --main-pad: 18px 24px 28px;
+  --head-gap: 14px;
+}
+main {
+  padding: var(--main-pad);
+}
+.card {
+  padding: var(--pad-y) var(--pad-x);
+}
+.card-head {
+  margin-bottom: calc(var(--gap) - 2px);
+}
+.grid,
+.stack {
+  gap: var(--gap);
+}
+.gap-b {
+  margin-bottom: var(--gap);
+}
+.gap-t {
+  margin-top: var(--gap);
+}
+.page-head {
+  margin-bottom: var(--head-gap);
+}
+.page-head h1 {
+  font-size: var(--h1-size);
+}
+.stat-value {
+  font-size: var(--stat-size);
+}
+.list-row {
+  padding: var(--row-y) 4px;
+}
+:root[data-density='compact'] .page-head {
+  align-items: center;
+}
+:root[data-density='compact'] .page-head .sub {
+  display: none;
+}
+:root[data-density='compact'] .page-head > div:first-child > .row {
+  margin-top: 0 !important;
+}
+:root[data-density='compact'] .page-head > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+:root[data-density='compact'] .stat {
+  gap: 2px;
+}
+:root[data-density='compact'] .day-head {
+  padding-top: 8px;
+}
+:root[data-density='compact'] .bar-row {
+  padding: 4px 0;
+}
+
+/* ---- operations in one line: date · category · comment · amount ---- */
+.op-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--row-y) 4px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  min-height: 36px;
+}
+.op-row:last-child {
+  border-bottom: 0;
+}
+.op-row:hover {
+  background: var(--hover);
+  border-radius: 8px;
+}
+.op-date {
+  width: 58px;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.op-cat {
+  flex-shrink: 0;
+  max-width: 46%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.op-note {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.op-row .amount {
+  margin-left: auto;
+  padding-left: 6px;
+}
+
+/* ---- customizable home ---- */
+.home-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+  align-items: start;
+}
+.home-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+}
+.home-card {
+  position: relative;
+  min-width: 0;
+}
+.home-card.off > :not(.card-tools) {
+  opacity: 0.35;
+}
+.card-tools {
+  position: absolute;
+  top: -13px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  gap: 0;
+  padding: 1px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--ink);
+  box-shadow: var(--shadow);
+}
+.card-tools .btn.icon-only {
+  width: 26px;
+  height: 24px;
+}
+.home-editing .home-tiles,
+.home-editing .home-cols {
+  padding-top: 8px;
+  row-gap: calc(var(--gap) + 10px);
+}
+.home-editing .home-cols > .stack {
+  gap: calc(var(--gap) + 10px);
+}
+.home-editing .home-card > .card {
+  outline: 1.5px dashed var(--muted);
+  outline-offset: 2px;
+}
+.edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: var(--gap);
+  border: 1.5px dashed var(--ink);
+  border-radius: 12px;
+}
+
+/* ---- collapsible sidebar ---- */
+.app {
+  transition: grid-template-columns 0.15s;
+}
+.brand {
+  position: relative;
+}
+.sidebar-toggle {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sidebar-toggle:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.brand.has-banner .sidebar-toggle {
+  position: relative;
+  z-index: 2;
+  color: #fff;
+}
+:root[data-sidebar='collapsed'] .app {
+  grid-template-columns: 64px 1fr;
+}
+:root[data-sidebar='collapsed'] .sidebar {
+  padding: 14px 8px;
+}
+:root[data-sidebar='collapsed'] .brand {
+  flex-direction: column;
+  padding: 0 0 12px;
+  gap: 8px;
+}
+:root[data-sidebar='collapsed'] .brand > span,
+:root[data-sidebar='collapsed'] .brand-media,
+:root[data-sidebar='collapsed'] .nav-group,
+:root[data-sidebar='collapsed'] .nav-label,
+:root[data-sidebar='collapsed'] .nav-lang,
+:root[data-sidebar='collapsed'] #pets-slot {
+  display: none;
+}
+:root[data-sidebar='collapsed'] .brand.has-banner {
+  height: auto;
+  margin: 0;
+  padding: 0 0 12px;
+  color: inherit;
+}
+:root[data-sidebar='collapsed'] .brand.has-banner::after {
+  display: none;
+}
+:root[data-sidebar='collapsed'] .brand .sidebar-toggle {
+  margin: 0;
+  color: var(--muted);
+}
+:root[data-sidebar='collapsed'] .nav-item {
+  justify-content: center;
+  padding: 9px 0;
+}
+:root[data-sidebar='collapsed'] #nav {
+  gap: 4px;
+}
+.nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- application status pill with its own dropdown ---- */
+.status-pill {
+  position: relative;
+  flex-shrink: 0;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--ink);
+  background: none;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pill.wish {
+  border-style: dashed;
+  border-color: var(--muted);
+  color: var(--ink-2);
+}
+.pill.interview,
+.pill.offer {
+  background: var(--ink);
+  color: var(--invert);
+}
+.pill.rejected {
+  border-color: var(--line);
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.pill:focus-visible,
+.pill-menu .pill:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.status-pill > .pill {
+  width: 136px;
+  justify-content: space-between;
+}
+.status-pill > .pill .pill-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pill-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  min-width: 170px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+.pill-menu .pill {
+  width: 100%;
+  justify-content: flex-start;
+}
+.pill-menu .pill.active {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.due-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.app-row.due .meta {
+  color: var(--muted);
+  font-weight: 400;
+}
+.app-row.status-rejected {
+  opacity: 1;
+}
+.app-row.status-rejected .title {
+  color: var(--muted);
+}
+
+/* ---- compact rank card ---- */
+.rank-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.rank-value {
+  border: 0;
+  border-bottom: 1.5px dashed transparent;
+  background: none;
+  padding: 0 4px 0 0;
+  font-size: var(--stat-size);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+}
+.rank-value:hover {
+  border-bottom-color: var(--muted);
+}
+.rank-top .input {
+  height: 32px;
+  width: 0;
+  flex: 1;
+  min-width: 56px;
+}
+.rank-top .btn {
+  height: 32px;
+  min-width: 32px;
+  padding: 0 10px;
+}
+.rank-top .rank-set {
+  font-size: 20px;
+  font-weight: 700;
+  height: 38px;
+}
+.rank-top select.input {
+  flex: 1 1 auto;
+  width: auto;
+}
+.rank-top select.input.sub-pick {
+  flex: 0 0 58px;
+  min-width: 0;
+}
+.rank-sub {
+  margin-bottom: 4px;
+}
+
+/* ---- charts: 11px labels at any size, hover guide ---- */
+.chart .axis {
+  font-size: calc(11px * var(--k, 1));
+}
+.chart .hover-line {
+  stroke: var(--ink);
+  stroke-width: calc(1px * var(--k, 1));
+  stroke-dasharray: 3 3;
+  opacity: 0;
+}
+.chart .hover-dot {
+  fill: var(--ink);
+  stroke: var(--card);
+  stroke-width: 2;
+  opacity: 0;
+}
+.chart.hovering .hover-line,
+.chart.hovering .hover-dot {
+  opacity: 1;
+}
+.chart .hover-band {
+  fill: var(--hover);
+  opacity: 0;
+}
+.chart .bar-group.hover .hover-band {
+  opacity: 1;
+}

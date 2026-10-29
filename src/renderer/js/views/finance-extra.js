@@ -67,7 +67,7 @@ export function budgetsTab() {
     h('button', { class: 'btn primary', onclick: () => budgetModal(null) }, icon('plus', 16), t('budget.add')),
     h(
       'div',
-      { class: 'grid cols-3', style: { marginBottom: '16px' } },
+      { class: 'grid cols-3 gap-b' },
       tile(t('budget.spent'), money(totalSpent), t('common.ofAmount', { amount: money(totalLimit) }), true),
       tile(t('budget.left'), money(Math.max(0, totalLimit - totalSpent)), totalLimit ? t('budget.used', { p: Math.round((totalSpent / totalLimit) * 100) }) : null),
       tile(t('budget.overCount'), String(over.length), over.length ? over.map((b) => catLabel(b.category)).join(', ') : t('budget.allOk')),
@@ -183,7 +183,7 @@ export function recurringTab() {
     h('button', { class: 'btn primary', onclick: () => recurringModal(null) }, icon('plus', 16), t('recurring.add')),
     h(
       'div',
-      { class: 'grid cols-3', style: { marginBottom: '16px' } },
+      { class: 'grid cols-3 gap-b' },
       tile(t('recurring.monthlyExpense'), money(m.expense), t('recurring.paymentsN', { n: list.filter((r) => r.active && r.type === 'expense').length }), true),
       tile(t('recurring.monthlyIncome'), money(m.income), null),
       tile(t('recurring.leftAfter'), money(m.income - m.expense), m.income ? t('recurring.freeShare', { p: Math.round(((m.income - m.expense) / m.income) * 100) }) : null),
@@ -274,7 +274,7 @@ export function goalsTab() {
     goals.length > 0 &&
       h(
         'div',
-        { style: { marginTop: '16px' } },
+        { class: 'gap-t' },
         card(
           t('goal.summary'),
           null,

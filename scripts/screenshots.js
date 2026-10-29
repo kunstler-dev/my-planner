@@ -182,9 +182,29 @@ app.on('browser-window-created', (_e, win) => {
           await click(name);
           if (name === 'grok') await wait(6000);
           await shot(`${name}-${theme}`);
+          if (name === 'home' && theme === 'light') {
+            await js(`document.querySelector('[data-action=customize]').click()`);
+            await shot('home-edit-light');
+            await js(`document.querySelector('.edit-bar .btn.primary').click()`);
+            await js(`document.querySelector('.sidebar-toggle').click()`);
+            await shot('home-collapsed-light');
+            await js(`document.querySelector('.sidebar-toggle').click()`);
+          }
+          if (name === 'career' && theme === 'light') {
+            await js(`document.querySelector('.status-pill .pill').click()`);
+            await shot('career-status-menu-light');
+            await js(`document.querySelector('.pill-menu').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+          }
           if (name === 'settings') {
             await js(`document.getElementById('main').scrollTop = 1e6`);
             await shot(`settings-bottom-${theme}`);
+            if (theme === 'light') {
+              await js(`document.querySelector('main .seg button[data-value=spacious]').click()`);
+              await click('home');
+              await shot('home-spacious-light');
+              await click('settings');
+              await js(`document.querySelector('main .seg button[data-value=compact]').click()`);
+            }
           }
           for (const t of (theme === 'light' && tabs) || []) {
             await tab(t);
